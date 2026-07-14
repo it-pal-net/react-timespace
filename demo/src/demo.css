@@ -1,0 +1,54 @@
+/* CSS custom properties the component reads (the host app is expected to
+   define these; see README). Values mirror SyncContact's default theme. */
+:root,
+[data-theme="light"] {
+  --surface: #ffffff;
+  --background-surface: #ffffff;
+  --text: #172b4d;
+  --timeline-text: #172b4d;
+  --text-subtle: #626f86;
+  --text-on-accent: #ffffff;
+  --accent: #0c66e4;
+  --border: #091e4224;
+  --background-neutral: #091e420f;
+  --background-neutral-hovered: #091e4224;
+  --clockHandBody: #0c66e4;
+  --clockHandTail: #ae4787;
+  --subheader-control-h: 32px;
+}
+
+[data-theme="dark"] {
+  --surface: #1d2125;
+  --background-surface: #1d2125;
+  --text: #b6c2cf;
+  --timeline-text: #b6c2cf;
+  --text-subtle: #8c9bab;
+  --text-on-accent: #1d2125;
+  --accent: #579dff;
+  --border: #a6c5e229;
+  --background-neutral: #a1bdd914;
+  --background-neutral-hovered: #a6c5e229;
+  --clockHandBody: #579dff;
+  --clockHandTail: #e774bb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  background: var(--surface);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100vh;
+}

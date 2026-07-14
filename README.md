@@ -7,6 +7,9 @@ meetings, hand-offs, or focus blocks that work for everyone.
 Extracted from (and battle-tested in) [SyncContact](https://synccontact.com),
 where it powers the Time Zones view.
 
+**Live demo:** <https://synccontact.com/timespace> · or embed it anywhere
+with one script tag (see [Embedding](#embedding)).
+
 ## Features
 
 - **One row per time zone** with hour ticks, live clocks, and a glowing
@@ -100,6 +103,35 @@ through `tzDispatch` from `TimeZonesContext`.
 | `theme` (via Emotion `ThemeProvider`)                         | object                          | Override `defaultTimespaceTheme` keys (`uiScale`, `mode`, `color.intervalHandBody`, `size.*`) |
 | `portalContainer`                                             | element                         | Host element for the row-drag ghost overlay                                                   |
 | `recomputeCollisionsKey`                                      | number                          | Bump to force a collision/layout recompute after external changes                             |
+
+## Embedding
+
+Don't use React? Drop the hosted widget into any page:
+
+```html
+<script
+  src="https://synccontact.com/timespace/embed.js"
+  data-zones="Europe/Berlin,America/New_York,Asia/Bangkok"
+  data-theme="dark"
+  defer
+></script>
+```
+
+The loader injects an iframe right after the script tag and keeps its height
+in sync. Attributes: `data-zones` (comma-separated IANA ids), `data-theme`
+(`light` | `dark`), `data-height` (initial px height).
+
+## Local development
+
+```sh
+npm install        # package deps + vitest
+npm test           # pure-core unit tests
+cd demo && npm install && npm run dev   # local playground on vite
+```
+
+The hosted playground lives at
+[synccontact.com/timespace](https://synccontact.com/timespace); `demo/` is
+the same experience for local development against your working copy.
 
 ## Architecture
 
