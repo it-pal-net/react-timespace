@@ -24,6 +24,7 @@
     "type": "git",
     "url": "git+ssh://git@github.com/it-pal-net/react-timespace.git"
   },
+  "homepage": "https://synccontact.com/timespace",
   "keywords": [
     "react",
     "timezone",
