@@ -45,6 +45,7 @@ import {
   intervalPosKeys,
 } from "./constants";
 import { withThemeDefaults } from "./theme";
+import resolveTheme from "./theming/resolveTheme";
 
 const defaultColliderState = {
   side: "right",
@@ -68,10 +69,18 @@ const Timespace = ({
   onAddCalendarEvent,
   recomputeCollisionsKey = 0,
   portalContainer,
+  theme: themeProp,
+  themeMode,
 }) => {
   const rootElRef = useRef(null);
   const outerTheme = useTheme();
-  const theme = useMemo(() => withThemeDefaults(outerTheme), [outerTheme]);
+  const theme = useMemo(
+    () =>
+      withThemeDefaults(
+        resolveTheme(themeProp, { mode: themeMode }) ?? outerTheme,
+      ),
+    [outerTheme, themeProp, themeMode],
+  );
   const { tzState, tzDispatch, timeLines, timeIntervals } =
     useContext(TimeZonesContext);
   const clockCtx = useTimeZonesClock();
@@ -485,6 +494,8 @@ Timespace.propTypes = {
   onAddCalendarEvent: PropTypes.func,
   recomputeCollisionsKey: PropTypes.number,
   portalContainer: PropTypes.object,
+  theme: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+  themeMode: PropTypes.oneOf(["light", "dark"]),
 };
 
 export default Timespace;

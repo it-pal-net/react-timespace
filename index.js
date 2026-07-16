@@ -28,6 +28,14 @@ export { default as tzOptions, tzPresets } from "./tzOptions";
 export { default as fontPresets } from "./fontPresets";
 export { defaultTimespaceTheme } from "./theme";
 export {
+  themePresets,
+  colorLabels,
+  TimespaceThemeProvider,
+  ThemePreviewContext,
+  useThemePreview,
+  resolveTheme,
+} from "./theming";
+export {
   formatDurationShort,
   formatDeltaToLocal,
   getTimeZoneOffsetSecondsSafe,

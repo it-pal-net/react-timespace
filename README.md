@@ -104,6 +104,68 @@ through `tzDispatch` from `TimeZonesContext`.
 | `portalContainer`                                             | element                         | Host element for the row-drag ghost overlay                                                   |
 | `recomputeCollisionsKey`                                      | number                          | Bump to force a collision/layout recompute after external changes                             |
 
+## Theming
+
+Three tiers, pick how deep you want to go:
+
+**1. Predefined themes — zero setup.** Pass a preset name (or a preset/flat
+theme object) straight to the component:
+
+```jsx
+<Timespace theme="dracula" themeMode="light" />
+```
+
+Presets ship in the package: `default`, `dracula`, `draculaV`, `terminal`,
+`solarized`, `solarizedArrakis`, `monokai`, `oneDark`, `gruvbox`, `nord`,
+`tomorrow`, `palenight`, `nightOwl`, `material`, `cobalt2`. The registry is
+exported as `themePresets`, and `resolveTheme(nameOrObject, { mode })` gives
+you the flat theme object if you want to feed your own Emotion
+`ThemeProvider`.
+
+**2. `TimespaceThemeProvider` — persisted selection.** Wraps your tree in an
+Emotion theme composed from the selected preset, the user's saved themes and
+the unsaved draft, all persisted in localStorage (`themeName`, `themeMode`,
+`localThemes`, `newTheme`):
+
+```jsx
+import { TimespaceThemeProvider } from "react-timespace";
+
+<TimespaceThemeProvider>
+  <Timespace />
+</TimespaceThemeProvider>;
+```
+
+Props: `themes` (extend/override the preset registry), `forceThemeMode`
+(`"light" | "dark"`), `defaultFont`.
+
+**3. Theme configurator — the full editor.** An opt-in UI (separate import,
+never bundled unless you use it) with preset picker + hover preview,
+light/dark toggle, Google-Font combobox, per-color editors with hex/alpha
+inputs, timeline sizing sliders, background fill, and save/rename/delete of
+user themes:
+
+```jsx
+import ThemeConfig from "react-timespace/theme-config";
+
+<TimespaceThemeProvider>
+  <Timespace />
+  <ThemeConfig />
+</TimespaceThemeProvider>;
+```
+
+`ThemeConfig` props:
+
+| Prop                             | Purpose                                                                                                       |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `excludedThemeNames`             | Hide presets from the picker                                                                                   |
+| `showTimespaceRenderingControls` | Hide the Time Zones tab (sizing/marker controls)                                                              |
+| `colorLabels`                    | Labels for extra color keys your themes carry (unknown keys render with their raw name)                       |
+| `components`                     | Host slots: `{ Select, Input, GradientPicker, ImagePicker }` — gradient/image background fills appear only when the matching slot is provided |
+
+The configurator styles itself with `--tsc-*` design tokens that read your
+app's CSS variables first (`--text`, `--background-brand-bold`, …) and fall
+back to sensible mode-aware defaults, so it drops into any app.
+
 ## Embedding
 
 Don't use React? Drop the hosted widget into any page:
