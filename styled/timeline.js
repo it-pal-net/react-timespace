@@ -107,6 +107,8 @@ export const TimeLineList = styled.div`
   }
 `;
 
+const panelEdge = "rgba(9, 30, 66, 0.06)";
+
 export const TimeLineItem = styled.div`
   display: flex;
   flex-direction: column;
@@ -128,7 +130,13 @@ export const TimeLineItem = styled.div`
     background: ${({ theme }) =>
       theme.mode === "dark"
         ? "rgba(6, 10, 16, 0.16)"
-        : "rgba(255, 255, 255, 0.2)"};
+        : "rgba(255, 255, 255, 0.5)"};
+    ${({ theme }) =>
+      theme.mode !== "dark" &&
+      `
+        border-left: 1px solid ${panelEdge};
+        border-right: 1px solid ${panelEdge};
+      `}
     backdrop-filter: blur(9px);
     -webkit-backdrop-filter: blur(9px);
     z-index: 0;
@@ -142,13 +150,25 @@ export const TimeLineItem = styled.div`
   &:first-of-type::before {
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
-    box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.22);
+    ${({ theme }) =>
+      theme.mode === "dark"
+        ? "box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.22);"
+        : `
+          border-top: 1px solid ${panelEdge};
+          box-shadow: 0 -10px 24px rgba(9, 30, 66, 0.07);
+        `}
   }
 
   &:last-of-type::before {
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+    ${({ theme }) =>
+      theme.mode === "dark"
+        ? "box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);"
+        : `
+          border-bottom: 1px solid ${panelEdge};
+          box-shadow: 0 10px 24px rgba(9, 30, 66, 0.07);
+        `}
   }
 
   &:first-of-type {
