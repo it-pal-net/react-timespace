@@ -1,43 +1,21 @@
-import { useContext, useEffect, useMemo, useState } from "react";
-import { ThemeProvider } from "@emotion/react";
+import { useContext, useEffect, useState } from "react";
+import { useTheme } from "@emotion/react";
 import PropTypes from "prop-types";
 
 import {
   Timespace,
   TimespaceProvider,
   TimeZonesContext,
+  TimespaceThemeProvider,
   setTimelines,
   addTimeline,
   deleteTimeline,
   addTimeInterval,
 } from "react-timespace";
+import ThemeConfig from "react-timespace/theme-config";
+import useLocalStorage from "react-timespace/hooks/useLocalStorage";
 
 const REPO_URL = "https://github.com/it-pal-net/react-timespace";
-
-const themeByMode = {
-  light: {
-    mode: "light",
-    color: {
-      text: "#172b4d",
-      borderHour: "#091e4224",
-      clockHandBody: "#0c66e4",
-      intervalHandBody: "#50fa7b",
-      clockHandTail: "#ae4787",
-    },
-    size: { borderHour: 2, clockHand: 3 },
-  },
-  dark: {
-    mode: "dark",
-    color: {
-      text: "#b6c2cf",
-      borderHour: "#a6c5e229",
-      clockHandBody: "#579dff",
-      intervalHandBody: "#50fa7b",
-      clockHandTail: "#e774bb",
-    },
-    size: { borderHour: 2, clockHand: 3 },
-  },
-};
 
 function getLocalZone() {
   try {
@@ -58,6 +36,67 @@ const toTimeLine = (timeZone, orderId) => ({
   color: null,
   allowDelete: true,
 });
+
+// Reflects the active theme onto the page: data-theme drives the demo.css
+// token blocks, and the widget-facing vars + font + background are set from
+// the theme so configurator changes apply live.
+function ThemeSurface() {
+  const theme = useTheme();
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme.mode;
+  }, [theme.mode]);
+
+  useEffect(() => {
+    const rootStyle = document.documentElement.style;
+    const colorVars = {
+      "--text": theme.color?.text,
+      "--timeline-text": theme.color?.text,
+      "--clockHandBody": theme.color?.clockHandBody,
+      "--clockHandTail": theme.color?.clockHandTail,
+    };
+    Object.entries(colorVars).forEach(([name, value]) => {
+      if (value) {
+        rootStyle.setProperty(name, value);
+      } else {
+        rootStyle.removeProperty(name);
+      }
+    });
+    return () => {
+      Object.keys(colorVars).forEach((name) => rootStyle.removeProperty(name));
+    };
+  }, [theme.color]);
+
+  useEffect(() => {
+    if (!theme.font) {
+      return undefined;
+    }
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `https://fonts.googleapis.com/css2?family=${theme.font}&display=swap`;
+    document.head.appendChild(link);
+
+    const family = theme.font.split(":")[0];
+    document.body.style.fontFamily = `${family}, ui-sans-serif, system-ui, sans-serif`;
+
+    return () => {
+      link.remove();
+      document.body.style.fontFamily = "";
+    };
+  }, [theme.font]);
+
+  useEffect(() => {
+    if (theme.background?.type !== "color" || !theme.background.color) {
+      return undefined;
+    }
+    document.body.style.background = theme.background.color;
+    return () => {
+      document.body.style.background = "";
+    };
+  }, [theme.background]);
+
+  return null;
+}
 
 function DemoTimespace() {
   const { tzDispatch, timeLines } = useContext(TimeZonesContext);
@@ -170,7 +209,14 @@ const timespaceAreaStyle = {
   justifyContent: "center",
 };
 
-function Header({ mode, onToggleMode }) {
+const themePanelStyle = {
+  width: 380,
+  flexShrink: 0,
+  overflowY: "auto",
+  borderLeft: "1px solid var(--border)",
+};
+
+function Header({ mode, onToggleMode, isThemePanelOpen, onToggleThemePanel }) {
   return (
     <header
       style={{
@@ -198,6 +244,9 @@ function Header({ mode, onToggleMode }) {
       <button type="button" style={buttonStyle} onClick={onToggleMode}>
         {mode === "dark" ? "☀️ Light" : "🌙 Dark"}
       </button>
+      <button type="button" style={buttonStyle} onClick={onToggleThemePanel}>
+        {isThemePanelOpen ? "✕ Close theme" : "🎨 Theme"}
+      </button>
       <a href={REPO_URL} style={{ color: "var(--accent)", fontSize: 14 }}>
         GitHub ★
       </a>
@@ -208,52 +257,61 @@ function Header({ mode, onToggleMode }) {
 Header.propTypes = {
   mode: PropTypes.oneOf(["light", "dark"]).isRequired,
   onToggleMode: PropTypes.func.isRequired,
+  isThemePanelOpen: PropTypes.bool.isRequired,
+  onToggleThemePanel: PropTypes.func.isRequired,
 };
 
 export default function App() {
-  const [mode, setMode] = useState("dark");
-  const theme = useMemo(() => themeByMode[mode], [mode]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = mode;
-  }, [mode]);
+  const [mode, setMode] = useLocalStorage("themeMode", "dark");
+  const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
 
   return (
-    <ThemeProvider theme={theme}>
+    <TimespaceThemeProvider>
+      <ThemeSurface />
       <TimespaceProvider>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            minHeight: "100vh",
-            padding: "0 24px 24px",
-            maxWidth: 1280,
-            margin: "0 auto",
-          }}
-        >
-          <Header
-            mode={mode}
-            onToggleMode={() => setMode(mode === "dark" ? "light" : "dark")}
-          />
-          <DemoTimespace />
-          <footer
+        <div style={{ display: "flex", minHeight: "100vh" }}>
+          <div
             style={{
-              textAlign: "center",
-              fontSize: 12,
-              color: "var(--text-subtle)",
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minWidth: 0,
+              padding: "0 24px 24px",
+              maxWidth: 1280,
+              margin: "0 auto",
             }}
           >
-            MIT · extracted from{" "}
-            <a href="https://synccontact.com" style={{ color: "inherit" }}>
-              SyncContact
-            </a>{" "}
-            ·{" "}
-            <a href={REPO_URL} style={{ color: "inherit" }}>
-              source
-            </a>
-          </footer>
+            <Header
+              mode={mode}
+              onToggleMode={() => setMode(mode === "dark" ? "light" : "dark")}
+              isThemePanelOpen={isThemePanelOpen}
+              onToggleThemePanel={() => setIsThemePanelOpen((open) => !open)}
+            />
+            <DemoTimespace />
+            <footer
+              style={{
+                textAlign: "center",
+                fontSize: 12,
+                color: "var(--text-subtle)",
+              }}
+            >
+              MIT · extracted from{" "}
+              <a href="https://synccontact.com" style={{ color: "inherit" }}>
+                SyncContact
+              </a>{" "}
+              ·{" "}
+              <a href={REPO_URL} style={{ color: "inherit" }}>
+                source
+              </a>
+            </footer>
+          </div>
+          {isThemePanelOpen && (
+            <aside style={themePanelStyle} aria-label="Theme configurator">
+              <ThemeConfig />
+            </aside>
+          )}
         </div>
       </TimespaceProvider>
-    </ThemeProvider>
+    </TimespaceThemeProvider>
   );
 }
