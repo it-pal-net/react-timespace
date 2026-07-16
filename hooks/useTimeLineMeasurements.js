@@ -17,6 +17,7 @@ export default function useTimeLineMeasurements({
   const timeZonesClockSampleElRef = useRef(null);
 
   const [size, setSize] = useState({
+    listHeight: null,
     bodyHeight: null,
     hoursLineWidth: null,
     topOffset: null,
@@ -60,10 +61,13 @@ export default function useTimeLineMeasurements({
       timeLinesLength * firstTimelineElRect.height + topTailOffset;
     const listHeight = listElRect.height;
 
+    // When the rows overflow, the marker body spans the full visible list. It
+    // used to add an extra header height here, which pushed the bottom tail and
+    // the "2h" duration label a header height past the visible bottom (and off
+    // the panel edge). Cap it at the list height so the lines end at the visible
+    // bottom and the label lands in the whitespace just below.
     const tailBodyHeight =
-      itemsHeight > listHeight
-        ? listHeight + timeLineItemHeaderHeight
-        : itemsHeight;
+      itemsHeight > listHeight ? listHeight : itemsHeight;
 
     const headerContentEls = Array.from(
       listElRef.current.querySelectorAll(".time-line-header-content"),
@@ -82,6 +86,7 @@ export default function useTimeLineMeasurements({
 
     setSize((currentSize) => ({
       ...currentSize,
+      listHeight,
       bodyHeight: tailBodyHeight,
       hoursLineWidth: firstHoursElRect.width,
       topOffset: itemsHeight > listHeight ? topListOffset : topFirstLineOffset,

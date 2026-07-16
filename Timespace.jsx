@@ -261,6 +261,15 @@ const Timespace = ({
     }
   };
 
+  // The "2h" duration label hangs `labelTailHeight` below the bottom of the
+  // interval marker lines (flush with their bottom tail). The overflow bug was
+  // never this offset — it was that `bodyHeight` overshot the visible list by a
+  // full header height, dragging both the lines' tails and this label past the
+  // panel edge. That's fixed in useTimeLineMeasurements (overflow body = list
+  // height), so the original offset is correct again.
+  const durationArrowYPos =
+    size.bodyHeight + size.topOffsetRelative + labelTailHeight;
+
   return (
     <ThemeProvider theme={theme}>
       <div
@@ -334,7 +343,7 @@ const Timespace = ({
           id="duration-size-holder"
           startX={0}
           endX={1}
-          yPos={size.bodyHeight + size.topOffsetRelative + labelTailHeight}
+          yPos={durationArrowYPos}
           leftBoundary={size.leftOffset}
           rightBoundary={size.hoursLineWidth + size.leftOffset}
           headerHeight={size.timeLineItemHeaderHeight}
@@ -372,9 +381,7 @@ const Timespace = ({
                       Math.max(timeInterval.xPos1, timeInterval.xPos2) -
                       size.leftListOffset
                     }
-                    yPos={
-                      size.bodyHeight + size.topOffsetRelative + labelTailHeight
-                    }
+                    yPos={durationArrowYPos}
                     leftBoundary={size.leftOffset}
                     rightBoundary={size.hoursLineWidth + size.leftOffset}
                     color={theme.color.intervalHandBody}
