@@ -200,6 +200,30 @@ export const Hours = styled.div`
   max-width: 2400px;
 `;
 
+const getHourBorderColor = ({ theme, period }) => {
+  if (theme.mode === "dark") {
+    return period === "night"
+      ? "rgba(255, 255, 255, 0.035)"
+      : "rgba(255, 255, 255, 0.07)";
+  }
+  return period === "night"
+    ? "rgba(17, 24, 39, 0.055)"
+    : "rgba(17, 24, 39, 0.08)";
+};
+
+const getHourPeriodBackground = ({ theme, period }) => {
+  const isDark = theme.mode === "dark";
+  switch (period) {
+    case "night":
+      return isDark ? "rgba(2, 6, 14, 0.5)" : "rgba(9, 30, 66, 0.08)";
+    case "morning":
+    case "evening":
+      return isDark ? "rgba(2, 6, 14, 0.24)" : "rgba(9, 30, 66, 0.04)";
+    default:
+      return isDark ? "rgba(255, 255, 255, 0.03)" : "transparent";
+  }
+};
+
 export const Hour = styled.div`
   display: flex;
   flex-direction: row;
@@ -213,28 +237,16 @@ export const Hour = styled.div`
   min-width: 28px;
   height: ${({ theme }) => theme.uiScale * 2}rem;
   align-items: center;
-  border: ${({ isEmpty, theme }) =>
+  border: ${({ isEmpty, theme, period }) =>
     isEmpty
       ? "none"
-      : `${theme.size.borderHour * theme.uiScale}px solid ${
-          theme.mode === "dark"
-            ? "rgba(255, 255, 255, 0.07)"
-            : "rgba(17, 24, 39, 0.08)"
-        }`};
+      : `${theme.size.borderHour * theme.uiScale}px solid ${getHourBorderColor(
+          { theme, period },
+        )}`};
   border-left: none;
   font-size: ${({ theme }) => theme.uiScale * 150}%;
   position: relative;
-  background-color: ${({ period }) => {
-    switch (period) {
-      case "night":
-        return "rgba(0, 0, 0, 0.04)";
-      case "morning":
-      case "evening":
-        return "rgba(120, 200, 255, 0.008)";
-      default:
-        return "transparent";
-    }
-  }};
+  background-color: ${getHourPeriodBackground};
   background-image: ${({
     isEmpty,
     isWeekend,
@@ -290,24 +302,47 @@ export const Hour = styled.div`
       will-change: box-shadow, filter;
     `}
 
-  ${({ isEmpty, isDayStart }) =>
+  ${({ isEmpty, isDayStart, theme }) =>
     !isEmpty &&
     isDayStart &&
-    `
-      box-shadow:
-        inset 1px 0 0 rgba(100, 140, 255, 0.16),
-        inset 2px 0 0 rgba(100, 140, 255, 0.04);
+    css`
+      &::after {
+        content: "";
+        position: absolute;
+        left: -1px;
+        top: -3px;
+        bottom: -3px;
+        width: 2px;
+        border-radius: 2px;
+        pointer-events: none;
+        background: ${theme.mode === "dark"
+          ? `linear-gradient(
+              180deg,
+              rgba(120, 200, 255, 0),
+              rgba(175, 225, 255, 0.95) 22%,
+              rgba(175, 225, 255, 0.95) 78%,
+              rgba(120, 200, 255, 0)
+            )`
+          : `linear-gradient(
+              180deg,
+              rgba(12, 102, 228, 0),
+              rgba(12, 102, 228, 0.75) 22%,
+              rgba(12, 102, 228, 0.75) 78%,
+              rgba(12, 102, 228, 0)
+            )`};
+        box-shadow: ${theme.mode === "dark"
+          ? "0 0 6px rgba(120, 200, 255, 0.6), 0 0 16px rgba(120, 200, 255, 0.3)"
+          : "0 0 5px rgba(12, 102, 228, 0.35), 0 0 10px rgba(12, 102, 228, 0.18)"};
+      }
     `}
 
   &:first-of-type {
-    border-left: ${({ isEmpty, theme }) =>
+    border-left: ${({ isEmpty, theme, period }) =>
       isEmpty
         ? "none"
-        : `${theme.size.borderHour * theme.uiScale}px solid ${
-            theme.mode === "dark"
-              ? "rgba(255, 255, 255, 0.07)"
-              : "rgba(17, 24, 39, 0.08)"
-          }`};
+        : `${
+            theme.size.borderHour * theme.uiScale
+          }px solid ${getHourBorderColor({ theme, period })}`};
   }
 
   @media (prefers-reduced-motion: reduce) {
