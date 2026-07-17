@@ -3,6 +3,9 @@
 export const labelTailHeight = 40;
 export const clockXTransformPercent = 10;
 
+// Width of the invisible grab strip centered on each interval hand.
+export const intervalHitStripWidth = 16;
+
 const basementFloor = 90;
 const baseFloor = 100;
 const headFloor = 200;

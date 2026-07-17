@@ -11,8 +11,9 @@ interactive "time interval" handles you can drag to select a range.
   interval endpoint.
 - **Dragging**:
   - reorder timelines (native HTML5 drag & drop + ghost overlay)
-  - resize interval endpoints
-  - move the whole interval range (drag the duration arrow text)
+  - resize interval endpoints (pointerdown on a 16px grab strip centered on
+    each hand, then window-level pointermove/pointerup)
+  - move the whole interval range (drag the duration arrow — line or text)
 - **Measurement & geometry**:
   - measure list/header/hour widths and offsets
   - convert between pixels and "seconds from start of day"
@@ -99,9 +100,15 @@ persist `*DayOffsetSeconds`.
     - runs collision + apply
 
 - **`hooks/useTimeIntervalDrag.js`**
-  - owns interval dragging (resize/move) and snapping
-  - uses refs for modifier keys and throttles mousemove using
-    `requestAnimationFrame`
+  - owns interval dragging (resize/move/float placement) and snapping
+  - pointer events: drags start from `pointerdown` on a grab surface and are
+    tracked with window-level `pointermove`/`pointerup` listeners, so the drag
+    survives the cursor leaving the list and the drop is never missed;
+    `pointercancel`/window `blur` also end the drag; Escape cancels and
+    restores drag-start positions
+  - reads snap modifiers (Ctrl/Cmd/Shift) from the pointer event itself
+  - throttles moves to one per `requestAnimationFrame`; latest render values
+    are read through a ref so the window handlers stay referentially stable
 
 - **`hooks/useTimelineReorderDnD.js`**
   - owns timeline reorder drag & drop + ghost overlay (appended into
@@ -121,14 +128,26 @@ While dragging an endpoint:
 - **Ctrl/Cmd**: snap to 1 second
 - **Shift**: snap to 5 minutes
 
+Moving the whole range snaps its leading edge with the same modifiers while
+keeping the pixel range exact, and clamps flush against the timeline edges.
+
 ### Move range
 
-Dragging the duration arrow text moves both endpoints together.
+Dragging the duration arrow (the invisible thick stroke over the line, or the
+text) moves both endpoints together.
 
 ### Creating an interval
 
-If an interval only has one endpoint, mouseup will auto-create a second
+If an interval only has one endpoint, pointerup will auto-create a second
 endpoint at a default range (2 hours).
+
+### Grab surfaces
+
+Each interval hand renders an invisible 16px-wide `IntervalHitStrip` over its
+full height (tails included), with a soft highlight band on hover and
+`ew-resize` cursor. The within-row hand segments (`TimeLineRow`) are purely
+visual (`pointer-events: none`); all pointer interaction goes through the
+strips and the duration arrow.
 
 ## Dependencies / assumptions
 
@@ -147,8 +166,10 @@ endpoint at a default range (2 hours).
 
 - If dragging feels "heavy":
   - most expensive work is the collision pass + context updates
-  - `useTimeIntervalDrag` throttles mousemove to 1/frame; ensure no additional
-    expensive rerenders are triggered elsewhere
+  - `useTimeIntervalDrag` throttles pointermove to 1/frame; ensure no
+    additional expensive rerenders are triggered elsewhere
+  - `TimeLine` (the 24 hour cells per row) is memoized — keep its props stable
+    during drags or every frame re-renders every cell again
 
 ## Future improvements (high value)
 

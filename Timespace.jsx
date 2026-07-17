@@ -23,7 +23,9 @@ import DurationArrow from "./DurationArrow";
 import * as S from "./styled";
 import useTimeLineMeasurements from "./hooks/useTimeLineMeasurements";
 import useTimelineReorderDnD from "./hooks/useTimelineReorderDnD";
-import useTimeIntervalDrag from "./hooks/useTimeIntervalDrag";
+import useTimeIntervalDrag, {
+  getResizeTargetPosKey,
+} from "./hooks/useTimeIntervalDrag";
 import useTimeLineCollisionResolution from "./hooks/useTimeLineCollisionResolution";
 import useTimeLineAutoCollision from "./hooks/useTimeLineAutoCollision";
 import TimespaceClockSync from "./TimespaceClockSync";
@@ -228,7 +230,7 @@ const Timespace = ({
     colliderTrigger: colliderTrigger + recomputeCollisionsKey,
   });
 
-  const { handleMouseMove, handleMouseUp, handleDragStartTimePoint } =
+  const { handlePointerMove, handlePointerUp, handleDragStartTimePoint } =
     useTimeIntervalDrag({
       tzState,
       tzDispatch,
@@ -281,8 +283,13 @@ const Timespace = ({
 
   return (
     <ThemeProvider theme={theme}>
+      {/* Pointer handlers on the root (not the list): a float-mode interval
+          must follow the cursor over the whole component, including the
+          markers and duration arrow that render outside the list. */}
       <div
         ref={rootElRef}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
         style={{
           display: "flex",
           position: "relative",
@@ -314,8 +321,6 @@ const Timespace = ({
         />
         <S.TimeLineList
           ref={listElRef}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
           onDragOver={handleDragOverTimeLineList}
           onDrop={handleDropTimeLine}
         >
@@ -339,7 +344,6 @@ const Timespace = ({
               handleDragStartTimeLine={handleDragStartTimeLine}
               handleDragTimeLine={handleDragTimeLine}
               handleDragEndTimeLine={handleDragEndTimeLine}
-              handleDragStartTimePoint={handleDragStartTimePoint}
               handleSetHomeZone={handleSetHomeZone}
               handleAddTimelinePlace={handleAddTimelinePlace}
               handleDeleteTimeline={handleDeleteTimeline}
@@ -374,6 +378,14 @@ const Timespace = ({
                       : null
                   }
                   onDeleteTimePoint={handleDeleteTimePoint}
+                  onResizeStart={(ev) => {
+                    handleDragStartTimePoint(
+                      ev,
+                      timeInterval.id,
+                      "resize",
+                      getResizeTargetPosKey(timeInterval, posKey),
+                    );
+                  }}
                 />
               ))}
 
@@ -404,8 +416,6 @@ const Timespace = ({
                         null,
                       );
                     }}
-                    handleMouseMove={handleMouseMove}
-                    handleMouseUp={handleMouseUp}
                   />
                 )}
             </Fragment>

@@ -1,6 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
+import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
+
+const ArrowSvg = styled.svg`
+  position: absolute;
+  overflow: visible;
+
+  .duration-grab {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .duration-visual {
+    transition: filter 120ms ease;
+  }
+
+  &:hover .duration-visual {
+    filter: brightness(1.3);
+  }
+
+  &:active .duration-grab {
+    cursor: grabbing;
+  }
+`;
 
 const DurationArrow = ({
   isSizeHolder = false,
@@ -14,8 +37,6 @@ const DurationArrow = ({
   durationText,
   headerHeight,
   handleDragStart,
-  handleMouseMove,
-  handleMouseUp,
 }) => {
   const theme = useTheme();
 
@@ -29,14 +50,13 @@ const DurationArrow = ({
   const rangeArrowWidth = 8;
   const arrowPoints = `0 0, ${rangeArrowWidth} ${rangeArrowHeight / 2}, 0 ${rangeArrowHeight}`;
   const rangeBothArrowsWidth = rangeArrowWidth * 2;
+  const grabStrokeWidth = 24;
 
   useEffect(() => {
-    setTimeout(() => {
-      if (durationTextElRef.current) {
-        setTextWidth(durationTextElRef.current.getBBox().width + 4);
-      }
-    }, 200);
-  }, [theme.uiScale]);
+    if (durationTextElRef.current) {
+      setTextWidth(durationTextElRef.current.getBBox().width + 4);
+    }
+  }, [theme.uiScale, durationText]);
 
   const textX = useMemo(() => {
     let calculatedTextX = Math.abs((endX - startX) / 2);
@@ -54,21 +74,16 @@ const DurationArrow = ({
 
   const showArrow = useMemo(() => {
     const extraSpace = 20;
-    let lineWidth =
+    const lineWidth =
       durationPixels -
       rangeBothArrowsWidth -
       clockHandSize * 2 -
       arrowPadding * 2 -
       extraSpace;
-    const arrowVisible = lineWidth > 0;
-    if (!arrowVisible) {
-      lineWidth = durationPixels;
-    }
-    return arrowVisible;
+    return lineWidth > 0;
   }, [durationPixels, rangeBothArrowsWidth]);
 
   const svgWidth = durationPixels;
-  // const svgHeight = headerHeight;
   const svgHeight = rangeArrowHeight * 2;
   const markerStartUrl = `url(#arrowhead-start-${id})`;
   const markerEndUrl = `url(#arrowhead-end-${id})`;
@@ -92,12 +107,10 @@ const DurationArrow = ({
   }
 
   return (
-    <svg
+    <ArrowSvg
       style={{
-        position: "absolute",
         top: yPos > maxYPos ? maxYPos : yPos,
         left: startX,
-        overflow: "visible",
       }}
       width={svgWidth}
       height={svgHeight}
@@ -127,6 +140,7 @@ const DurationArrow = ({
         </defs>
       )}
       <line
+        className="duration-visual"
         x1={clockHandSize + rangeArrowWidth}
         y1="0"
         x2={durationPixels - rangeArrowWidth}
@@ -136,26 +150,35 @@ const DurationArrow = ({
         markerStart={markerStartUrl}
         markerEnd={markerEndUrl}
       />
+      {/* Invisible thick stroke: makes the whole arrow (not just the text)
+          a grab surface for moving the range. */}
+      <line
+        className="duration-grab"
+        x1={0}
+        y1={0}
+        x2={durationPixels}
+        y2={0}
+        stroke="transparent"
+        strokeWidth={grabStrokeWidth}
+        style={{ pointerEvents: "stroke" }}
+        onPointerDown={handleDragStart}
+      />
       <text
         ref={durationTextElRef}
+        className="duration-grab duration-visual"
         x={textX}
         fill={color}
         textAnchor="middle"
-        onMouseUp={handleMouseUp}
-        onMouseDown={handleDragStart}
-        onMouseMove={handleMouseMove}
+        onPointerDown={handleDragStart}
         style={{
           fontSize,
-          cursor: "e-resize",
           transform: `translateY(-${headerHeight / 2}px)`,
           userSelect: "none",
-          // pointerEvents: "none",
         }}
-        draggable
       >
         {durationText}
       </text>
-    </svg>
+    </ArrowSvg>
   );
 };
 
@@ -171,8 +194,6 @@ DurationArrow.propTypes = {
   durationText: PropTypes.string,
   headerHeight: PropTypes.number,
   handleDragStart: PropTypes.func,
-  handleMouseMove: PropTypes.func,
-  handleMouseUp: PropTypes.func,
 };
 
 export default DurationArrow;

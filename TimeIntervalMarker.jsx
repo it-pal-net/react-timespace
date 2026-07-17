@@ -4,7 +4,11 @@ import { useTheme } from "@emotion/react";
 import Button from "./ui/Button";
 import { CrossIcon, AddCalendarEventIcon } from "./ui/icons";
 import * as S from "./styled";
-import { labelTailHeight, zIndexFloors } from "./constants";
+import {
+  labelTailHeight,
+  intervalHitStripWidth,
+  zIndexFloors,
+} from "./constants";
 
 /**
  * Full-height vertical line with rounded tails above and below the timeline
@@ -78,12 +82,16 @@ const TimeIntervalMarker = ({
   size,
   onAddCalendarEvent,
   onDeleteTimePoint,
+  onResizeStart,
 }) => {
   const theme = useTheme();
 
   if (timeInterval[posKey] === null) {
     return null;
   }
+
+  const left = timeInterval[posKey] - size.leftListOffset;
+  const lineWidth = theme.uiScale * theme.size.clockHand;
 
   return (
     <S.TimePoint
@@ -92,12 +100,26 @@ const TimeIntervalMarker = ({
         pointerEvents: timeInterval.mode === "fixed" ? "auto" : "none",
       }}
     >
+      {/* The grab surface: a wide invisible strip centered on the hand, so the
+          whole visible line is draggable, not just a 3px sliver. Rendered
+          before the marker pieces so `~` sibling styles can light them up. */}
+      <S.IntervalHitStrip
+        data-interval-hit-strip={posKey}
+        style={{
+          top: size.topOffsetRelative - labelTailHeight,
+          height: size.bodyHeight + labelTailHeight * 2,
+          left: left - (intervalHitStripWidth - lineWidth) / 2,
+          width: intervalHitStripWidth,
+        }}
+        onPointerDown={onResizeStart}
+      />
       <VerticalMarker
         size={size}
-        left={timeInterval[posKey] - size.leftListOffset}
+        left={left}
+        className="interval-marker-piece"
         backgroundColor={theme.color.intervalHandBody}
         cursor={
-          ["fixed", "resize"].includes(timeInterval.mode) ? "e-resize" : "auto"
+          ["fixed", "resize"].includes(timeInterval.mode) ? "ew-resize" : "auto"
         }
         topTailChildren={
           timeInterval.mode !== "float" && (
@@ -151,6 +173,7 @@ TimeIntervalMarker.propTypes = {
   size: PropTypes.object.isRequired,
   onAddCalendarEvent: PropTypes.func,
   onDeleteTimePoint: PropTypes.func.isRequired,
+  onResizeStart: PropTypes.func.isRequired,
 };
 
 export default TimeIntervalMarker;

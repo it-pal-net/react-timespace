@@ -39,11 +39,6 @@ StaticTimeZoneAbbrev.propTypes = {
   timeZone: PropTypes.string.isRequired,
 };
 
-// Dragging the only point of an interval creates/resizes its second point;
-// otherwise each handle resizes itself.
-const getResizeTargetPosKey = (timeInterval, posKey) =>
-  timeInterval.xPos2 == null ? "xPos2" : posKey;
-
 const TimeLineRow = ({
   timeLine,
   rowElRef,
@@ -59,7 +54,6 @@ const TimeLineRow = ({
   handleDragStartTimeLine,
   handleDragTimeLine,
   handleDragEndTimeLine,
-  handleDragStartTimePoint,
   handleSetHomeZone,
   handleAddTimelinePlace,
   handleDeleteTimeline,
@@ -151,49 +145,6 @@ const TimeLineRow = ({
       )}
 
       <S.TimeLineHeader ref={headerElRef}>
-        {timeIntervals.map((timeInterval) => (
-          <Fragment key={timeInterval.id}>
-            {intervalPosKeys.map(
-              (posKey) =>
-                timeInterval[posKey] !== null && (
-                  <S.TimePoint
-                    key={posKey}
-                    draggable
-                    onDragStart={(ev) => {
-                      handleDragStartTimePoint(
-                        ev,
-                        timeInterval.id,
-                        "resize",
-                        getResizeTargetPosKey(timeInterval, posKey),
-                      );
-                    }}
-                    style={{
-                      pointerEvents:
-                        timeInterval.mode === "fixed" ? "auto" : "none",
-                    }}
-                  >
-                    <S.TimePointBody
-                      style={{
-                        position: "absolute",
-                        height: "100%",
-                        top: 0,
-                        left: timeInterval[posKey] - size.leftListOffset,
-                        cursor: ["fixed", "resize"].includes(timeInterval.mode)
-                          ? "e-resize"
-                          : "auto",
-                        backgroundColor: theme.color.intervalHandBody,
-                        zIndex:
-                          posKey === "xPos1"
-                            ? zIndexFloors.basement
-                            : zIndexFloors.base,
-                      }}
-                    />
-                  </S.TimePoint>
-                ),
-            )}
-          </Fragment>
-        ))}
-
         <S.TimeLineHeaderContent>
           <div
             style={{
@@ -461,6 +412,31 @@ const TimeLineRow = ({
         hourMaxWidth={HOUR_MAX_WIDTH}
         timer={clockCtx?.timer}
       />
+      {/* Crisp within-row segments of the interval hands. The full-height
+          marker line (rendered at the Timespace level) sits at basement
+          z-index, behind the rows' frosted-glass background, so without these
+          the hands look blurred/dimmed across the hour cells. Same pattern as
+          the now-line segment below. */}
+      {timeIntervals.map((timeInterval) => (
+        <Fragment key={timeInterval.id}>
+          {intervalPosKeys.map(
+            (posKey) =>
+              timeInterval[posKey] !== null && (
+                <S.TimePointBody
+                  key={posKey}
+                  style={{
+                    position: "absolute",
+                    height: "100%",
+                    top: 0,
+                    left: timeInterval[posKey] - size.leftListOffset,
+                    backgroundColor: theme.color.intervalHandBody,
+                    pointerEvents: "none",
+                  }}
+                />
+              ),
+          )}
+        </Fragment>
+      ))}
       <S.TimePointBody
         className="timeline-now-line"
         style={{
@@ -490,7 +466,6 @@ TimeLineRow.propTypes = {
   handleDragStartTimeLine: PropTypes.func.isRequired,
   handleDragTimeLine: PropTypes.func.isRequired,
   handleDragEndTimeLine: PropTypes.func.isRequired,
-  handleDragStartTimePoint: PropTypes.func.isRequired,
   handleSetHomeZone: PropTypes.func.isRequired,
   handleAddTimelinePlace: PropTypes.func,
   handleDeleteTimeline: PropTypes.func,
