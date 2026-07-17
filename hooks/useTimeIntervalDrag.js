@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useRef } from "react";
 
+// Dragging the only point of an interval creates/resizes its second point;
+// otherwise each handle resizes itself.
+export const getResizeTargetPosKey = (timeInterval, posKey) =>
+  timeInterval.xPos2 == null ? "xPos2" : posKey;
+
+/**
+ * Interval drag interaction.
+ *
+ * Explicit drags (resize a hand / move the whole range) start from a
+ * `pointerdown` on a grab surface and are tracked with window-level
+ * pointermove/pointerup listeners, so the drag keeps working when the cursor
+ * leaves the timeline list and the drop is never missed. Escape cancels an
+ * active drag and restores the positions captured at drag start.
+ *
+ * A freshly added interval (mode "float") has no pointer capture: it follows
+ * the cursor via the container's pointermove and is placed on pointerup.
+ */
 export default function useTimeIntervalDrag({
   tzState,
   tzDispatch,
@@ -15,56 +32,253 @@ export default function useTimeIntervalDrag({
   calculateDurationData,
   updateTimeInterval,
 }) {
+  // Latest render values, readable from the stable window-level handlers.
+  const latestRef = useRef(null);
+  latestRef.current = {
+    tzState,
+    size,
+    formatDuration,
+    collider,
+    colliderState,
+    applyCollisionResolution,
+    calculateSecondsFromStartOfDay,
+    calculatePositionFromDayOffset,
+    calculateDurationData,
+  };
+
   const capturedTimeIntervalIdRef = useRef(null);
-  const intervalMoveStartXRef = useRef(null);
-
-  const isCtrlOrCmdPressedRef = useRef(false);
-  const isShiftPressedRef = useRef(false);
-
-  const rafScheduledRef = useRef(false);
-  const lastMouseEventRef = useRef(null);
+  // Active pointer-drag session (null while idle / float-follow).
+  const dragRef = useRef(null);
+  const teardownRef = useRef(null);
+  const rafRef = useRef(null);
+  const lastPointerRef = useRef(null);
 
   useEffect(() => {
     // Keep an id of an active (non-fixed) interval if any, but without forcing rerenders.
     capturedTimeIntervalIdRef.current =
-      timeIntervals.find((tp) => tp.mode !== "fixed")?.id ?? null;
+      timeIntervals.find((ti) => ti.mode !== "fixed")?.id ?? null;
   }, [timeIntervals]);
 
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.ctrlKey || event.metaKey) {
-        isCtrlOrCmdPressedRef.current = true;
-      }
-      if (event.key === "Shift") {
-        isShiftPressedRef.current = true;
-      }
+  const applyPointer = useCallback((pointer) => {
+    const {
+      tzState: state,
+      size: sizes,
+      formatDuration: formatDurationFn,
+      collider: colliderFn,
+      colliderState: colliderStateValue,
+      applyCollisionResolution: applyResolution,
+      calculateSecondsFromStartOfDay: toSeconds,
+      calculatePositionFromDayOffset: toXPos,
+      calculateDurationData: toDurationData,
+    } = latestRef.current;
+
+    const capturedId = capturedTimeIntervalIdRef.current;
+    if (capturedId == null) {
+      return;
+    }
+
+    const capturedTimeInterval = state.timeIntervalsMap[capturedId];
+    const isTimeIntervalReadyForAction =
+      capturedTimeInterval &&
+      sizes.hoursLineWidth &&
+      sizes.timeIntervalClockWidth &&
+      ["float", "resize", "move"].includes(capturedTimeInterval.mode);
+    if (!isTimeIntervalReadyForAction) {
+      return;
+    }
+
+    const leftBoundary = sizes.leftOffset + sizes.leftListOffset;
+    const rightBoundary = sizes.hoursLineWidth + leftBoundary;
+
+    let stepSeconds = pointer.fineStep ? 1 : state.intervalStepSeconds;
+    if (pointer.coarseStep) {
+      stepSeconds = 5 * 60;
+    }
+    const snapXPos = (xPos) => {
+      const snappedSeconds =
+        Math.round(toSeconds(xPos) / stepSeconds) * stepSeconds;
+      return toXPos(snappedSeconds);
     };
 
-    const handleKeyUp = (event) => {
-      if (event.key === "Control" || event.key === "Meta") {
-        isCtrlOrCmdPressedRef.current = false;
+    let xPos1;
+    let xPos2;
+    if (capturedTimeInterval.mode === "move") {
+      const drag = dragRef.current;
+      if (drag == null) {
+        return;
       }
-      if (event.key === "Shift") {
-        isShiftPressedRef.current = false;
+
+      const rangePixels =
+        capturedTimeInterval.xPos2 - capturedTimeInterval.xPos1;
+      const startPos = Math.min(
+        capturedTimeInterval.xPos1,
+        capturedTimeInterval.xPos2,
+      );
+      const endPos = Math.max(
+        capturedTimeInterval.xPos1,
+        capturedTimeInterval.xPos2,
+      );
+
+      // Clamp the offset so the range lands flush against the timeline edge
+      // instead of stopping at the last valid position.
+      const moveOffset = Math.max(
+        leftBoundary - startPos,
+        Math.min(rightBoundary - endPos, pointer.clientX - drag.lastClientX),
+      );
+      // Snap the leading edge, keep the pixel range exact.
+      xPos1 = snapXPos(capturedTimeInterval.xPos1 + moveOffset);
+      xPos2 = xPos1 + rangePixels;
+      if (xPos2 < leftBoundary || xPos2 > rightBoundary) {
+        xPos1 = capturedTimeInterval.xPos1 + moveOffset;
+        xPos2 = capturedTimeInterval.xPos2 + moveOffset;
       }
+      drag.lastClientX += moveOffset;
+    } else {
+      const { actionPoint } = capturedTimeInterval;
+      const newXPos = snapXPos(
+        Math.max(leftBoundary, Math.min(rightBoundary, pointer.clientX)),
+      );
+      xPos1 = actionPoint === "xPos1" ? newXPos : capturedTimeInterval.xPos1;
+      xPos2 = actionPoint === "xPos2" ? newXPos : capturedTimeInterval.xPos2;
+    }
+
+    const capturedIntervalDispatchData = {
+      ...capturedTimeInterval,
+      xPos1,
+      xPos2,
+      xPos1DayOffsetSeconds: xPos1 === null ? null : toSeconds(xPos1),
+      xPos2DayOffsetSeconds: xPos2 === null ? null : toSeconds(xPos2),
+      ...toDurationData({
+        xPos1,
+        xPos2,
+        hoursLineWidth: sizes.hoursLineWidth,
+        formatDuration: formatDurationFn,
+      }),
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keyup", handleKeyUp);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keyup", handleKeyUp);
-    };
+    const fixed = colliderFn({
+      timeInterval: capturedIntervalDispatchData,
+      timeZonesClock: colliderStateValue.timeZonesClock,
+      timeLineName: colliderStateValue.timeLineName,
+    });
+    applyResolution(fixed, capturedIntervalDispatchData);
   }, []);
+
+  const handlePointerMove = useCallback(
+    (ev) => {
+      lastPointerRef.current = {
+        clientX: ev.clientX,
+        fineStep: ev.ctrlKey || ev.metaKey,
+        coarseStep: ev.shiftKey,
+      };
+      if (rafRef.current != null) {
+        return;
+      }
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (lastPointerRef.current) {
+          applyPointer(lastPointerRef.current);
+        }
+      });
+    },
+    [applyPointer],
+  );
+
+  const cancelPendingMove = useCallback(() => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    lastPointerRef.current = null;
+  }, []);
+
+  const finishDrag = useCallback(() => {
+    const {
+      tzState: state,
+      size: sizes,
+      formatDuration: formatDurationFn,
+      calculateSecondsFromStartOfDay: toSeconds,
+      calculatePositionFromDayOffset: toXPos,
+      calculateDurationData: toDurationData,
+    } = latestRef.current;
+
+    const capturedId = capturedTimeIntervalIdRef.current;
+    if (capturedId == null) {
+      return;
+    }
+
+    // A queued move applied after the drop would resurrect the drag mode.
+    cancelPendingMove();
+
+    const capturedTimeInterval = state.timeIntervalsMap[capturedId];
+    if (!["resize", "move", "float"].includes(capturedTimeInterval?.mode)) {
+      return;
+    }
+
+    let updatedInterval = { id: capturedId, mode: "fixed" };
+
+    if (!capturedTimeInterval.xPos2) {
+      const twoHoursInSeconds = 2 * 60 * 60;
+
+      const xPos1DayOffsetSeconds = toSeconds(capturedTimeInterval.xPos1);
+      let xPos2DayOffsetSeconds = xPos1DayOffsetSeconds + twoHoursInSeconds;
+
+      if (xPos2DayOffsetSeconds > secondsInDay) {
+        xPos2DayOffsetSeconds -= twoHoursInSeconds * 2;
+      }
+      updatedInterval.xPos2DayOffsetSeconds = xPos2DayOffsetSeconds;
+      updatedInterval.xPos2 = toXPos(xPos2DayOffsetSeconds);
+      updatedInterval = {
+        ...updatedInterval,
+        ...toDurationData({
+          xPos1: capturedTimeInterval.xPos1,
+          xPos2: updatedInterval.xPos2,
+          hoursLineWidth: sizes.hoursLineWidth,
+          formatDuration: formatDurationFn,
+        }),
+      };
+    }
+    tzDispatch(updateTimeInterval(updatedInterval));
+  }, [tzDispatch, updateTimeInterval, secondsInDay, cancelPendingMove]);
+
+  const stopWindowDrag = useCallback(
+    ({ commit }) => {
+      const teardown = teardownRef.current;
+      teardownRef.current = null;
+      teardown?.();
+
+      const drag = dragRef.current;
+      dragRef.current = null;
+
+      if (commit) {
+        finishDrag();
+        return;
+      }
+      cancelPendingMove();
+      if (drag?.snapshot?.id != null) {
+        tzDispatch(updateTimeInterval({ ...drag.snapshot, mode: "fixed" }));
+      }
+    },
+    [finishDrag, cancelPendingMove, tzDispatch, updateTimeInterval],
+  );
 
   const handleDragStartTimePoint = useCallback(
     (ev, id, mode, actionPoint) => {
+      if (ev.button != null && ev.button !== 0) {
+        return;
+      }
       ev.preventDefault();
       ev.stopPropagation();
 
+      // A previous drag that somehow never ended must not leak listeners.
+      teardownRef.current?.();
+
       capturedTimeIntervalIdRef.current = id;
-      intervalMoveStartXRef.current = ev.clientX;
+      dragRef.current = {
+        id,
+        lastClientX: ev.clientX,
+        snapshot: { ...latestRef.current.tzState.timeIntervalsMap[id] },
+      };
 
       tzDispatch(
         updateTimeInterval({
@@ -73,220 +287,57 @@ export default function useTimeIntervalDrag({
           actionPoint,
         }),
       );
-    },
-    [tzDispatch, updateTimeInterval],
-  );
 
-  const handleMouseMoveInternal = useCallback(
-    (ev) => {
-      const capturedId = capturedTimeIntervalIdRef.current;
-      if (capturedId == null) {
-        return;
-      }
-
-      const capturedTimeInterval = tzState.timeIntervalsMap[capturedId];
-
-      const isTimeIntervalReadyForAction =
-        capturedTimeInterval &&
-        size.hoursLineWidth &&
-        size.timeIntervalClockWidth &&
-        ["float", "resize", "move"].includes(capturedTimeInterval?.mode);
-
-      if (!isTimeIntervalReadyForAction) {
-        return;
-      }
-
-      const validateXPosBoundary = (pos) => {
-        const leftBoundary = size.leftOffset + size.leftListOffset;
-        const rightBoundary =
-          size.hoursLineWidth + size.leftOffset + size.leftListOffset;
-        if (pos < leftBoundary) {
-          return [leftBoundary, true];
+      const onPointerUp = () => stopWindowDrag({ commit: true });
+      const onKeyDown = (keyEv) => {
+        if (keyEv.key === "Escape") {
+          stopWindowDrag({ commit: false });
         }
-        if (pos > rightBoundary) {
-          return [rightBoundary, true];
-        }
-        return [pos, false];
       };
 
-      if (capturedTimeInterval.mode === "move") {
-        const moveStartX = intervalMoveStartXRef.current;
-        if (moveStartX == null) {
-          intervalMoveStartXRef.current = ev.clientX;
-          return;
-        }
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("pointercancel", onPointerUp);
+      window.addEventListener("blur", onPointerUp);
+      window.addEventListener("keydown", onKeyDown);
 
-        const currentRange = (
-          capturedTimeInterval.xPos2 - capturedTimeInterval.xPos1
-        ).toFixed(2);
-        const moveOffset = ev.clientX - moveStartX;
+      const previousBodyCursor = document.body.style.cursor;
+      document.body.style.cursor = mode === "move" ? "grabbing" : "ew-resize";
 
-        const [newXPos1, isBoundaryPos1] = validateXPosBoundary(
-          capturedTimeInterval.xPos1 + moveOffset,
-        );
-        const [newXPos2, isBoundaryPos2] = isBoundaryPos1
-          ? [capturedTimeInterval.xPos2, false]
-          : validateXPosBoundary(capturedTimeInterval.xPos2 + moveOffset);
-
-        const xPos1 = isBoundaryPos2 ? capturedTimeInterval.xPos1 : newXPos1;
-        const xPos2 = isBoundaryPos1 ? capturedTimeInterval.xPos2 : newXPos2;
-        const newRange = (xPos2 - xPos1).toFixed(2);
-
-        if (newRange !== currentRange) {
-          return;
-        }
-
-        const capturedIntervalDispatchData = {
-          ...capturedTimeInterval,
-          xPos1,
-          xPos2,
-          xPos1DayOffsetSeconds: calculateSecondsFromStartOfDay(xPos1),
-          xPos2DayOffsetSeconds: calculateSecondsFromStartOfDay(xPos2),
-          ...calculateDurationData({
-            xPos1,
-            xPos2,
-            hoursLineWidth: size.hoursLineWidth,
-            formatDuration,
-          }),
-        };
-        const fixed = collider({
-          timeInterval: {
-            ...capturedIntervalDispatchData,
-            xPos1,
-            xPos2,
-          },
-          timeZonesClock: colliderState.timeZonesClock,
-          timeLineName: colliderState.timeLineName,
-        });
-        applyCollisionResolution(fixed, {
-          ...capturedIntervalDispatchData,
-          xPos1,
-          xPos2,
-        });
-
-        intervalMoveStartXRef.current = ev.clientX;
-      } else {
-        const { actionPoint } = capturedTimeInterval;
-
-        let [newXPos] = validateXPosBoundary(ev.clientX);
-        const offsetSeconds = calculateSecondsFromStartOfDay(newXPos);
-
-        let stepSeconds = isCtrlOrCmdPressedRef.current
-          ? 1
-          : tzState.intervalStepSeconds;
-        if (isShiftPressedRef.current) {
-          stepSeconds = 5 * 60;
-        }
-
-        const snappedOffsetSeconds =
-          Math.round(offsetSeconds / stepSeconds) * stepSeconds;
-        newXPos = calculatePositionFromDayOffset(snappedOffsetSeconds);
-
-        const capturedIntervalDispatchData = {
-          ...capturedTimeInterval,
-          [actionPoint]: newXPos,
-          [`${actionPoint}DayOffsetSeconds`]:
-            calculateSecondsFromStartOfDay(newXPos),
-          ...calculateDurationData({
-            xPos1: capturedTimeInterval.xPos1,
-            xPos2: capturedTimeInterval.xPos2,
-            hoursLineWidth: size.hoursLineWidth,
-            formatDuration,
-          }),
-        };
-
-        const fixed = collider({
-          timeInterval: capturedIntervalDispatchData,
-          timeZonesClock: colliderState.timeZonesClock,
-          timeLineName: colliderState.timeLineName,
-        });
-        applyCollisionResolution(fixed, capturedIntervalDispatchData);
-      }
+      teardownRef.current = () => {
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        window.removeEventListener("pointercancel", onPointerUp);
+        window.removeEventListener("blur", onPointerUp);
+        window.removeEventListener("keydown", onKeyDown);
+        document.body.style.cursor = previousBodyCursor;
+      };
     },
-    [
-      tzState,
-      tzDispatch,
-      size,
-      formatDuration,
-      collider,
-      colliderState,
-      applyCollisionResolution,
-      calculateSecondsFromStartOfDay,
-      calculatePositionFromDayOffset,
-      calculateDurationData,
-    ],
+    [tzDispatch, updateTimeInterval, handlePointerMove, stopWindowDrag],
   );
 
-  const handleMouseMove = useCallback(
-    (ev) => {
-      lastMouseEventRef.current = ev;
-      if (rafScheduledRef.current) return;
-
-      rafScheduledRef.current = true;
-      requestAnimationFrame(() => {
-        rafScheduledRef.current = false;
-        const lastEv = lastMouseEventRef.current;
-        if (lastEv) {
-          handleMouseMoveInternal(lastEv);
-        }
-      });
-    },
-    [handleMouseMoveInternal],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    const capturedId = capturedTimeIntervalIdRef.current;
-    if (capturedId == null) {
+  // Placement of a float-mode interval: it has no pointer capture, so the
+  // container's pointerup finalizes it. Window listeners own explicit drags.
+  const handlePointerUp = useCallback(() => {
+    if (dragRef.current != null) {
       return;
     }
+    finishDrag();
+  }, [finishDrag]);
 
-    const capturedTimeInterval = tzState.timeIntervalsMap[capturedId];
-    if (["resize", "move", "float"].includes(capturedTimeInterval?.mode)) {
-      let updatedInterval = { id: capturedId, mode: "fixed" };
-
-      if (!capturedTimeInterval.xPos2) {
-        const twoHoursInSeconds = 2 * 60 * 60;
-
-        const xPos1DayOffsetSeconds = calculateSecondsFromStartOfDay(
-          capturedTimeInterval.xPos1,
-        );
-        let xPos2DayOffsetSeconds = xPos1DayOffsetSeconds + twoHoursInSeconds;
-
-        if (xPos2DayOffsetSeconds > secondsInDay) {
-          xPos2DayOffsetSeconds -= twoHoursInSeconds * 2;
-        }
-        updatedInterval.xPos2DayOffsetSeconds = xPos2DayOffsetSeconds;
-
-        updatedInterval.xPos2 = calculatePositionFromDayOffset(
-          updatedInterval.xPos2DayOffsetSeconds,
-        );
-        updatedInterval = {
-          ...updatedInterval,
-          ...calculateDurationData({
-            xPos1: capturedTimeInterval.xPos1,
-            xPos2: updatedInterval.xPos2,
-            hoursLineWidth: size.hoursLineWidth,
-            formatDuration,
-          }),
-        };
+  useEffect(
+    () => () => {
+      teardownRef.current?.();
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
       }
-      tzDispatch(updateTimeInterval(updatedInterval));
-    }
-  }, [
-    tzState,
-    tzDispatch,
-    size.hoursLineWidth,
-    formatDuration,
-    secondsInDay,
-    calculateSecondsFromStartOfDay,
-    calculatePositionFromDayOffset,
-    calculateDurationData,
-    updateTimeInterval,
-  ]);
+    },
+    [],
+  );
 
   return {
-    handleMouseMove,
-    handleMouseUp,
+    handlePointerMove,
+    handlePointerUp,
     handleDragStartTimePoint,
   };
 }

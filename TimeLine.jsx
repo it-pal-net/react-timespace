@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import PropTypes from "prop-types";
 
 import * as S from "./styled";
@@ -243,4 +243,7 @@ TimeLine.propTypes = {
   timer: PropTypes.number,
 };
 
-export default TimeLine;
+// Memoized: interval drags dispatch context updates every frame, and the 24
+// styled Hour cells per row are the most expensive part of a row render. All
+// props here are stable during a drag (timer only ticks once per second).
+export default memo(TimeLine);

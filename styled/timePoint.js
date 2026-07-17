@@ -2,6 +2,7 @@ import styled from "@emotion/styled";
 import { css } from "@emotion/react";
 
 import { timelineNowGlow, timelineNowPulse } from "./animations";
+import { zIndexFloors } from "../constants";
 
 const timelineNowLineStyles = css`
   &.timeline-now-line {
@@ -68,4 +69,33 @@ export const TimePointLabel = styled.div`
   position: absolute;
   border-radius: 4px;
   color: var(--text);
+`;
+
+export const IntervalHitStrip = styled.div`
+  position: absolute;
+  z-index: ${zIndexFloors.head};
+  cursor: ew-resize;
+  touch-action: none;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: rgba(120, 200, 255, 0);
+    transition: background 120ms ease;
+    pointer-events: none;
+  }
+
+  &:hover::after {
+    background: rgba(120, 200, 255, 0.12);
+  }
+
+  &:active::after {
+    background: rgba(120, 200, 255, 0.2);
+  }
+
+  &:hover ~ .interval-marker-piece {
+    filter: brightness(1.25);
+  }
 `;
