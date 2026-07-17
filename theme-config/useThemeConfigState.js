@@ -20,6 +20,8 @@ export default function useThemeConfigState({
   const theme = useTheme();
   const {
     themes,
+    defaultThemeName,
+    defaultThemeMode,
     setPreviewThemeName,
     clearPreviewThemeName,
     committedFont,
@@ -29,8 +31,12 @@ export default function useThemeConfigState({
   const allThemes = themes ?? themePresets;
   const [_, setNewTheme] = useLocalStorage("newTheme", null);
   const [localThemes, setLocalThemes] = useLocalStorage("localThemes", {});
-  const [themeName, setTheme] = useLocalStorage("themeName", "default");
-  const [themeMode, setThemeMode] = useLocalStorage("themeMode", "dark");
+  // Until the user stores a choice the provider decides, and it may follow the
+  // host app, so show what it fell back to rather than assuming the presets.
+  const [storedThemeName, setTheme] = useLocalStorage("themeName", null);
+  const themeName = storedThemeName ?? defaultThemeName;
+  const [storedThemeMode, setThemeMode] = useLocalStorage("themeMode", null);
+  const themeMode = storedThemeMode ?? defaultThemeMode;
   const [newThemeName, setNewThemeName] = useState("");
   const [showThemeNameInput, setShowThemeNameInput] = useState(false);
   const [activeTab, setActiveTab] = useState("app");

@@ -15,13 +15,20 @@ function TimespaceThemeProvider({
   children,
   themes = themePresets,
   forceThemeMode,
+  defaultThemeName = "default",
+  defaultThemeMode = "dark",
   defaultFont = DEFAULT_FONT,
 }) {
-  const [themeName] = useLocalStorage("themeName", "default");
+  // A stored value of null means the user never picked one, so the defaults
+  // stand in. They are applied after the read rather than passed to
+  // useLocalStorage, whose initial value is captured once and would strand a
+  // default that the host resolves later.
+  const [storedThemeName] = useLocalStorage("themeName", null);
+  const themeName = storedThemeName ?? defaultThemeName;
   const [previewThemeName, setPreviewThemeName] = useState(null);
   const [previewFont, setPreviewFont] = useState(null);
-  const [themeMode] = useLocalStorage("themeMode", forceThemeMode ?? "dark");
-  const mode = forceThemeMode ?? themeMode;
+  const [storedThemeMode] = useLocalStorage("themeMode", null);
+  const mode = forceThemeMode ?? storedThemeMode ?? defaultThemeMode;
 
   const [localThemes] = useLocalStorage("localThemes", {});
 
@@ -53,6 +60,8 @@ function TimespaceThemeProvider({
     <ThemePreviewContext.Provider
       value={{
         themes,
+        defaultThemeName,
+        defaultThemeMode: forceThemeMode ?? defaultThemeMode,
         previewThemeName,
         setPreviewThemeName,
         clearPreviewThemeName,
@@ -71,6 +80,8 @@ TimespaceThemeProvider.propTypes = {
   children: PropTypes.node,
   themes: PropTypes.object,
   forceThemeMode: PropTypes.oneOf(["light", "dark"]),
+  defaultThemeName: PropTypes.string,
+  defaultThemeMode: PropTypes.oneOf(["light", "dark"]),
   defaultFont: PropTypes.string,
 };
 
