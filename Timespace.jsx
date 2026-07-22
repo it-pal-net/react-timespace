@@ -67,6 +67,10 @@ const Timespace = ({
   renderPlaceSelector,
   showTimezoneAbbreviation: showTimezoneAbbreviationProp,
   showSeconds: showSecondsProp,
+  // Distraction-free rows: keep the name, clock and hour strip; drop the
+  // delete control, contacts/place badge, home marker, delta-to-home and tz
+  // abbreviation. Backward-compatible (off by default).
+  minimal = false,
   deltaBase = "home",
   formatDuration,
   onAddCalendarEvent,
@@ -343,6 +347,7 @@ const Timespace = ({
               getLineHighlight={getLineHighlight}
               renderPlaceSelector={renderPlaceSelector}
               showTimezoneAbbreviation={showTimezoneAbbreviation}
+              minimal={minimal}
               deltaBase={deltaBase}
               deltaBaseZone={deltaBaseZone}
               deltaToLocalByZone={deltaToLocalByZone}
@@ -505,6 +510,7 @@ Timespace.propTypes = {
   renderPlaceSelector: PropTypes.func,
   showTimezoneAbbreviation: PropTypes.bool,
   showSeconds: PropTypes.bool,
+  minimal: PropTypes.bool,
   deltaBase: PropTypes.oneOf(["local", "home"]),
   formatDuration: PropTypes.func,
   onAddCalendarEvent: PropTypes.func,

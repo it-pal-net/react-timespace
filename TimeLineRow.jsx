@@ -48,6 +48,7 @@ const TimeLineRow = ({
   colliderState,
   isNowXPosReady,
   showTimezoneAbbreviation,
+  minimal,
   deltaBase,
   deltaBaseZone,
   deltaToLocalByZone,
@@ -302,7 +303,8 @@ const TimeLineRow = ({
                   ) : (
                     timeLine.name
                   )}
-                  {timeLine.mode !== "edit" &&
+                  {!minimal &&
+                    timeLine.mode !== "edit" &&
                     timeLine.timeZone !== deltaBaseZone &&
                     timeLine.timeZone !== tzState.homeZone &&
                     deltaToLocalByZone[timeLine.timeZone] && (
@@ -319,7 +321,8 @@ const TimeLineRow = ({
                         {deltaToLocalByZone[timeLine.timeZone]}
                       </span>
                     )}
-                  {tzState.homeZone === timeLine.timeZone &&
+                  {!minimal &&
+                    tzState.homeZone === timeLine.timeZone &&
                     timeLine.name !== null && (
                       <span
                         className="home-emoji"
@@ -331,7 +334,7 @@ const TimeLineRow = ({
                       </span>
                     )}
                 </S.TimeLineName>
-                {timeLine.mode !== "edit" && (
+                {!minimal && timeLine.mode !== "edit" && (
                   <span
                     style={{
                       display: "inline-flex",
@@ -357,7 +360,7 @@ const TimeLineRow = ({
                   </span>
                 )}
 
-                {timeLine.allowDelete && (
+                {!minimal && timeLine.allowDelete && (
                   <S.EditModeActions
                     isCollided={colliderState.timeLineName.isCollided}
                   >
@@ -386,7 +389,8 @@ const TimeLineRow = ({
                   </S.EditModeActions>
                 )}
                 {colliderState.timeLineName.side === "left" && contactsInLine}
-                {showTimezoneAbbreviation &&
+                {!minimal &&
+                  showTimezoneAbbreviation &&
                   timeLine.mode !== "edit" &&
                   timeLine.timeZone !== "Etc/UTC" && (
                     <div
@@ -460,6 +464,7 @@ TimeLineRow.propTypes = {
   colliderState: PropTypes.object.isRequired,
   isNowXPosReady: PropTypes.bool,
   showTimezoneAbbreviation: PropTypes.bool,
+  minimal: PropTypes.bool,
   deltaBase: PropTypes.oneOf(["local", "home"]),
   deltaBaseZone: PropTypes.string,
   deltaToLocalByZone: PropTypes.object.isRequired,
