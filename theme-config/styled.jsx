@@ -1172,6 +1172,58 @@ export const SegmentedOption = styled.button`
   }
 `;
 
+export const PrefRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+`;
+
+export const PrefRowMain = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+`;
+
+export const Switch = styled.button`
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin-top: 2px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid
+    ${({ checked }) =>
+      checked ? "var(--tsc-brand)" : "rgba(127, 127, 127, 0.36)"};
+  background: ${({ checked }) =>
+    checked ? "var(--tsc-brand)" : "rgba(127, 127, 127, 0.24)"};
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: ${({ checked }) => (checked ? "16px" : "2px")};
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: left 150ms ease;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--tsc-brand);
+    outline-offset: 1px;
+  }
+`;
+
 export const LightCloseButton = styled.button`
   display: inline-flex;
   align-items: center;

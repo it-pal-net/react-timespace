@@ -66,6 +66,7 @@ const Timespace = ({
   getLineHighlight,
   renderPlaceSelector,
   showTimezoneAbbreviation: showTimezoneAbbreviationProp,
+  showSeconds: showSecondsProp,
   deltaBase = "home",
   formatDuration,
   onAddCalendarEvent,
@@ -96,7 +97,11 @@ const Timespace = ({
     typeof showTimezoneAbbreviationProp === "boolean"
       ? showTimezoneAbbreviationProp
       : showTimezoneAbbreviationStored;
-  const [showSeconds] = useLocalStorage("showSeconds", false);
+  // Controlled hosts (URL-driven playground) pass showSeconds as a prop;
+  // uncontrolled hosts (the app) read it from localStorage.
+  const [showSecondsStored] = useLocalStorage("showSeconds", false);
+  const showSeconds =
+    typeof showSecondsProp === "boolean" ? showSecondsProp : showSecondsStored;
   const [isNowXPosReady, setIsNowXPosReady] = useState(false);
 
   const {
@@ -499,6 +504,7 @@ Timespace.propTypes = {
   getLineHighlight: PropTypes.func,
   renderPlaceSelector: PropTypes.func,
   showTimezoneAbbreviation: PropTypes.bool,
+  showSeconds: PropTypes.bool,
   deltaBase: PropTypes.oneOf(["local", "home"]),
   formatDuration: PropTypes.func,
   onAddCalendarEvent: PropTypes.func,
