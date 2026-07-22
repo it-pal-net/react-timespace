@@ -180,12 +180,19 @@ const initialState = {
 
 export const createTimeZonesProvider =
   (TZContext, TZClockContext) =>
-  ({ children, intervalSeconds = 1 }) => {
+  ({ children, intervalSeconds = 1, timeFormat: timeFormatProp }) => {
     const [state, dispatch] = useReducer(
       combinedKeyValueReducer(resourcesReducer),
       initialState,
     );
-    const [timeFormat] = useLocalStorage("timeFormat", "24");
+    // Controlled (URL-driven hosts like the /timespace playground) pass
+    // timeFormat as a prop; uncontrolled hosts (the app) read it from
+    // localStorage.
+    const [storedTimeFormat] = useLocalStorage("timeFormat", "24");
+    const timeFormat =
+      timeFormatProp === "12" || timeFormatProp === "24"
+        ? timeFormatProp
+        : storedTimeFormat;
 
     // Self-correcting ticker aligned to the next interval boundary.
     // This keeps "seconds ticking" visually consistent even if the main thread stalls briefly.
