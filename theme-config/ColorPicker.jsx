@@ -18,17 +18,19 @@ function ColorPicker({ color = "#000000", setColor, renderTrigger }) {
 
   const debouncedSetColor = useDebounce(setColor, 500);
 
+  // Mirror external color changes (preset switch, hover preview, reset) into the
+  // local swatch. This sync is passive — it must never feed back into setColor,
+  // or hovering a preset to preview it would be committed to the theme draft as
+  // a phantom "unsaved" edit.
   useEffect(() => {
-    if (inputColor !== color) {
-      debouncedSetColor(inputColor);
-    }
-  }, [inputColor]);
-
-  useEffect(() => {
-    if (inputColor !== color) {
-      setInputColor(color);
-    }
+    setInputColor(color);
   }, [color]);
+
+  // Only an explicit pick from the wheel commits a color to the theme.
+  const handlePickColor = (nextColor) => {
+    setInputColor(nextColor);
+    debouncedSetColor(nextColor);
+  };
 
   useLayoutEffect(() => {
     if (!isOpen || !triggerWrapRef.current) {
@@ -90,7 +92,7 @@ function ColorPicker({ color = "#000000", setColor, renderTrigger }) {
         position &&
         createPortal(
           <S.ColorPickerPopover ref={popoverRef} style={position}>
-            <HexColorPicker color={inputColor} onChange={setInputColor} />
+            <HexColorPicker color={inputColor} onChange={handlePickColor} />
           </S.ColorPickerPopover>,
           document.body,
         )}
