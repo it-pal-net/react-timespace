@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
 import { Image as ImageIcon, X } from "lucide-react";
 
@@ -165,43 +166,46 @@ function ThemeConfigBackgroundTab({ state, actions }) {
         )}
       </ThemeConfigSectionCard>
 
-      {isImagePickerOpen && ImagePicker && (
-        <S.BackgroundPickerOverlay
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setIsImagePickerOpen(false);
-            }
-          }}
-        >
-          <S.BackgroundPickerDialog
-            role="dialog"
-            aria-modal="true"
-            aria-label="Choose background image"
+      {isImagePickerOpen &&
+        ImagePicker &&
+        createPortal(
+          <S.BackgroundPickerOverlay
+            role="presentation"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setIsImagePickerOpen(false);
+              }
+            }}
           >
-            <S.BackgroundPickerHeader>
-              <S.BackgroundPickerHeaderCopy>
-                <S.SectionHeaderTitle>
-                  Choose background image
-                </S.SectionHeaderTitle>
-                <S.SecondaryText>
-                  Browse wallpapers and pick one for the current appearance.
-                </S.SecondaryText>
-              </S.BackgroundPickerHeaderCopy>
-              <S.LightCloseButton
-                type="button"
-                aria-label="Close image picker"
-                onClick={() => setIsImagePickerOpen(false)}
-              >
-                <X size={14} />
-              </S.LightCloseButton>
-            </S.BackgroundPickerHeader>
-            <S.BackgroundPickerBody>
-              <ImagePicker />
-            </S.BackgroundPickerBody>
-          </S.BackgroundPickerDialog>
-        </S.BackgroundPickerOverlay>
-      )}
+            <S.BackgroundPickerDialog
+              role="dialog"
+              aria-modal="true"
+              aria-label="Choose background image"
+            >
+              <S.BackgroundPickerHeader>
+                <S.BackgroundPickerHeaderCopy>
+                  <S.SectionHeaderTitle>
+                    Choose background image
+                  </S.SectionHeaderTitle>
+                  <S.SecondaryText>
+                    Browse wallpapers and pick one for the current appearance.
+                  </S.SecondaryText>
+                </S.BackgroundPickerHeaderCopy>
+                <S.LightCloseButton
+                  type="button"
+                  aria-label="Close image picker"
+                  onClick={() => setIsImagePickerOpen(false)}
+                >
+                  <X size={14} />
+                </S.LightCloseButton>
+              </S.BackgroundPickerHeader>
+              <S.BackgroundPickerBody>
+                <ImagePicker />
+              </S.BackgroundPickerBody>
+            </S.BackgroundPickerDialog>
+          </S.BackgroundPickerOverlay>,
+          document.body,
+        )}
     </>
   );
 }
