@@ -102,6 +102,31 @@ export const CompactTab = styled.button`
   }
 `;
 
+// Tab-less layout: each former tab becomes an always-open, labelled group so
+// the whole configurator reads as one scroll (used by the standalone widget,
+// where switching App/Time Zones/Background tabs is needless chrome).
+export const ConfigGroup = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`;
+
+export const GroupHeading = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.14);
+  color: var(--tsc-text);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+
+  svg {
+    color: var(--tsc-brand);
+  }
+`;
+
 export const PresetToolbar = styled.div`
   display: flex;
   flex-direction: column;

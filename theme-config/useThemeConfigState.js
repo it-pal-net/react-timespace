@@ -16,6 +16,7 @@ const TIMESPACES_COLOR_KEYS = [
 export default function useThemeConfigState({
   excludedThemeNames = [],
   showTimespaceRenderingControls = true,
+  excludedColorKeys = [],
 }) {
   const theme = useTheme();
   const {
@@ -44,9 +45,16 @@ export default function useThemeConfigState({
   const [copiedHexKey, setCopiedHexKey] = useState(null);
   const menuRef = useRef(null);
 
+  // Host apps can hide color keys that are meaningless in their surface (e.g.
+  // the synccontact-only `contactCardSelected` on the generic /timespace
+  // playground). Filtering here keeps them out of the rows, the change
+  // detection and the reset handlers alike.
   const themeColorVariables = useMemo(
-    () => Object.keys(theme.color),
-    [theme.color],
+    () =>
+      Object.keys(theme.color).filter(
+        (colorVar) => !excludedColorKeys.includes(colorVar),
+      ),
+    [theme.color, excludedColorKeys],
   );
   const appThemeColorKeys = useMemo(
     () =>
