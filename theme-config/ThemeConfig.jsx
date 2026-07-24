@@ -17,6 +17,8 @@ function ThemeConfig({
   excludedThemeNames = [],
   showTimespaceRenderingControls = true,
   showGroupTimelinesControl = false,
+  showTabs = true,
+  excludedColorKeys = [],
   prefs,
   onPrefsChange,
   components = {},
@@ -33,6 +35,7 @@ function ThemeConfig({
   const state = useThemeConfigState({
     excludedThemeNames,
     showTimespaceRenderingControls,
+    excludedColorKeys,
   });
   const presetToolbarState = {
     theme: state.theme,
@@ -118,6 +121,25 @@ function ThemeConfig({
     onResetBackground: state.resetBackground,
   };
 
+  const appTabBody = (
+    <ThemeConfigAppTab state={appTabState} actions={appTabActions} />
+  );
+  const timespacesTabBody = state.showTimespaceRenderingControls ? (
+    <ThemeConfigTimespacesTab
+      state={timespacesTabState}
+      actions={timespacesTabActions}
+      showGroupTimelinesControl={showGroupTimelinesControl}
+      prefs={prefs}
+      onPrefsChange={onPrefsChange}
+    />
+  ) : null;
+  const backgroundTabBody = (
+    <ThemeConfigBackgroundTab
+      state={backgroundTabState}
+      actions={backgroundTabActions}
+    />
+  );
+
   return (
     <ThemeConfigContext.Provider value={configContextValue}>
       <S.ThemeConfig>
@@ -126,55 +148,67 @@ function ThemeConfig({
           actions={presetToolbarActions}
         />
 
-        <S.CompactTabs>
-          <S.CompactTab
-            type="button"
-            isActive={state.activeTab === "app"}
-            onClick={() => state.setActiveTab("app")}
-          >
-            <AppWindow size={14} />
-            App
-          </S.CompactTab>
-          {state.showTimespaceRenderingControls && (
-            <S.CompactTab
-              type="button"
-              isActive={state.activeTab === "timespaces"}
-              onClick={() => state.setActiveTab("timespaces")}
-            >
-              <Clock size={14} />
-              Time Zones
-            </S.CompactTab>
-          )}
-          <S.CompactTab
-            type="button"
-            isActive={state.activeTab === "background"}
-            onClick={() => state.setActiveTab("background")}
-          >
-            <ImageIcon size={14} />
-            Background
-          </S.CompactTab>
-        </S.CompactTabs>
+        {showTabs ? (
+          <>
+            <S.CompactTabs>
+              <S.CompactTab
+                type="button"
+                isActive={state.activeTab === "app"}
+                onClick={() => state.setActiveTab("app")}
+              >
+                <AppWindow size={14} />
+                App
+              </S.CompactTab>
+              {state.showTimespaceRenderingControls && (
+                <S.CompactTab
+                  type="button"
+                  isActive={state.activeTab === "timespaces"}
+                  onClick={() => state.setActiveTab("timespaces")}
+                >
+                  <Clock size={14} />
+                  Time Zones
+                </S.CompactTab>
+              )}
+              <S.CompactTab
+                type="button"
+                isActive={state.activeTab === "background"}
+                onClick={() => state.setActiveTab("background")}
+              >
+                <ImageIcon size={14} />
+                Background
+              </S.CompactTab>
+            </S.CompactTabs>
 
-        {state.activeTab === "app" && (
-          <ThemeConfigAppTab state={appTabState} actions={appTabActions} />
-        )}
-
-        {state.activeTab === "timespaces" &&
-          state.showTimespaceRenderingControls && (
-            <ThemeConfigTimespacesTab
-              state={timespacesTabState}
-              actions={timespacesTabActions}
-              showGroupTimelinesControl={showGroupTimelinesControl}
-              prefs={prefs}
-              onPrefsChange={onPrefsChange}
-            />
-          )}
-
-        {state.activeTab === "background" && (
-          <ThemeConfigBackgroundTab
-            state={backgroundTabState}
-            actions={backgroundTabActions}
-          />
+            {state.activeTab === "app" && appTabBody}
+            {state.activeTab === "timespaces" && timespacesTabBody}
+            {state.activeTab === "background" && backgroundTabBody}
+          </>
+        ) : (
+          <>
+            <S.ConfigGroup>
+              <S.GroupHeading>
+                <AppWindow size={14} />
+                App
+              </S.GroupHeading>
+              {appTabBody}
+            </S.ConfigGroup>
+            {timespacesTabBody && (
+              <S.ConfigGroup>
+                <S.GroupHeading>
+                  <Clock size={14} />
+                  Time Zones
+                </S.GroupHeading>
+                {timespacesTabBody}
+              </S.ConfigGroup>
+            )}
+            <S.ConfigGroup>
+              <S.GroupHeading>
+                <ImageIcon size={14} />
+                Background
+              </S.GroupHeading>
+              {backgroundTabBody}
+            </S.ConfigGroup>
+          </>
         )}
 
         <ThemeConfigFooter
@@ -192,6 +226,13 @@ ThemeConfig.propTypes = {
   // When true, the Time Zones tab also offers the host-consumed
   // "Group timelines by" control (writes the `groupTimelinesBy` pref).
   showGroupTimelinesControl: PropTypes.bool,
+  // When false, drop the App/Time Zones/Background tab bar and stack every
+  // section as one flat, labelled scroll — for standalone widget surfaces
+  // where the whole panel is just "theme this widget".
+  showTabs: PropTypes.bool,
+  // Color keys to hide from the App/Time Zones color rows — for host-specific
+  // colors baked into the presets that don't apply to this surface.
+  excludedColorKeys: PropTypes.arrayOf(PropTypes.string),
   // Controlled prefs: pass both to drive the Time Zones view prefs from host
   // state (e.g. URL) instead of localStorage.
   prefs: PropTypes.object,
