@@ -1,7 +1,7 @@
 import { Fragment, useContext } from "react";
 import PropTypes from "prop-types";
 import { useTheme } from "@emotion/react";
-import { MapPin } from "lucide-react";
+import { House, MapPin } from "lucide-react";
 
 import { TimeZonesContext, useTimeZonesClock } from "./state/timeZonesProvider";
 import { deleteTimeline, updateTimeline } from "./state/actions";
@@ -321,16 +321,26 @@ const TimeLineRow = ({
                         {deltaToLocalByZone[timeLine.timeZone]}
                       </span>
                     )}
-                  {!minimal &&
-                    tzState.homeZone === timeLine.timeZone &&
+                  {tzState.homeZone === timeLine.timeZone &&
                     timeLine.name !== null && (
                       <span
                         className="home-emoji"
                         title="Home timezone"
                         aria-label="Home timezone"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginLeft: "8px",
+                          width: "20px",
+                          height: "20px",
+                          borderRadius: "999px",
+                          color: "var(--text-on-accent, #fff)",
+                          background: "var(--accent, #3b82f6)",
+                          verticalAlign: "middle",
+                        }}
                       >
-                        {" "}
-                        {"🏠"}
+                        <House size={13} strokeWidth={2.5} />
                       </span>
                     )}
                 </S.TimeLineName>
