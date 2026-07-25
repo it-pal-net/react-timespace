@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { setTimelines } from "../state/actions";
 
@@ -7,6 +7,37 @@ import {
   getReorderPreviewDeltas,
   findOverIdByPointerY,
 } from "../core/timelineReorderPreview";
+
+const PREVIEW_MS = 120;
+const SETTLE_MS = 170;
+// Escape hatch: if the reorder never reaches the DOM (host overrode the order,
+// commit aborted, …) restore the rows instead of leaving them transformed.
+const HANDOFF_TIMEOUT_MS = 700;
+
+const prefersReducedMotion = () => {
+  try {
+    return (
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true
+    );
+  } catch (_err) {
+    return false;
+  }
+};
+
+const getTranslateY = (el) => {
+  const value = window.getComputedStyle(el).transform;
+  if (!value || value === "none") return 0;
+  try {
+    return new DOMMatrixReadOnly(value).m42 || 0;
+  } catch (_err) {
+    // matrix(a, b, c, d, tx, ty)
+    const parts = value.match(/matrix\(([^)]+)\)/)?.[1]?.split(",");
+    return parts?.length === 6 ? parseFloat(parts[5]) || 0 : 0;
+  }
+};
+
+const getOrderKey = (timeLines) =>
+  (timeLines ?? []).map((tl) => tl?.id).join("|");
 
 export default function useTimelineReorderDnD({
   timeLines,
@@ -56,6 +87,12 @@ export default function useTimelineReorderDnD({
     lastEl: null,
     timer: null,
   });
+  // Set from `drop`/`dragend` and consumed by the layout effect below, which
+  // strips the preview transforms in the very frame React paints the reordered
+  // rows (so the list never flashes back to its pre-drag order).
+  const postCommitRef = useRef(null);
+  const handoffTimerRef = useRef(null);
+  const settleTimerRef = useRef(null);
 
   useEffect(() => {
     timeLinesRef.current = timeLines;
@@ -129,6 +166,14 @@ export default function useTimelineReorderDnD({
         cancelAnimationFrame(commitRef.current.raf);
         commitRef.current.raf = null;
       }
+      if (handoffTimerRef.current != null) {
+        clearTimeout(handoffTimerRef.current);
+        handoffTimerRef.current = null;
+      }
+      if (settleTimerRef.current != null) {
+        clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
       if (dropFlashRef.current.timer != null) {
         clearTimeout(dropFlashRef.current.timer);
         dropFlashRef.current.timer = null;
@@ -187,6 +232,20 @@ export default function useTimelineReorderDnD({
     commitRef.current.pending = { activeId, overId };
     const start = performance.now();
 
+    // Claim the handoff up front: `dragend` fires before the commit lands and
+    // must not tear the preview down.
+    postCommitRef.current = { activeId, expectedOrderKey: null };
+    if (handoffTimerRef.current != null) clearTimeout(handoffTimerRef.current);
+    handoffTimerRef.current = setTimeout(() => {
+      handoffTimerRef.current = null;
+      if (!postCommitRef.current) return;
+      debugLog("handoff timed out", { reason });
+      const pendingActiveId = postCommitRef.current.activeId;
+      postCommitRef.current = null;
+      cleanupClone();
+      resetReorderPreviewStyles({ activeId: pendingActiveId });
+    }, HANDOFF_TIMEOUT_MS);
+
     commitRef.current.raf = requestAnimationFrame(() => {
       commitRef.current.raf = null;
       const pending = commitRef.current.pending;
@@ -194,6 +253,7 @@ export default function useTimelineReorderDnD({
 
       if (!pending?.activeId || !pending?.overId) {
         commitRef.current.scheduled = false;
+        abandonHandoff();
         return;
       }
 
@@ -209,6 +269,7 @@ export default function useTimelineReorderDnD({
       if (from === -1 || to === -1 || from === to) {
         commitRef.current.scheduled = false;
         debugLog("commit aborted (indices)", { reason, aId, oId, from, to });
+        abandonHandoff();
         return;
       }
 
@@ -224,14 +285,18 @@ export default function useTimelineReorderDnD({
         else next.push(reorderedUnlocked[unlockedCursor++]);
       }
 
-      tzDispatch(
-        setTimelines(
-          next.map((tl, index) => ({
-            ...tl,
-            orderId: index + 1,
-          })),
-        ),
-      );
+      const nextTimelines = next.map((tl, index) => ({
+        ...tl,
+        orderId: index + 1,
+      }));
+
+      // The layout effect waits for exactly this order to reach the DOM before
+      // it releases the preview transforms.
+      if (postCommitRef.current) {
+        postCommitRef.current.expectedOrderKey = getOrderKey(nextTimelines);
+      }
+
+      tzDispatch(setTimelines(nextTimelines));
 
       debugLog("commit applied", {
         reason,
@@ -242,14 +307,6 @@ export default function useTimelineReorderDnD({
 
       // Run after the state update is enqueued.
       if (onSetTimelinesOrder) onSetTimelinesOrder();
-
-      // Highlight the moved timeline in its new position after DOM updates.
-      // Two rAFs is a cheap way to wait for React to commit the reorder.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          flashDroppedRow(aId);
-        });
-      });
 
       commitRef.current.scheduled = false;
     });
@@ -262,10 +319,19 @@ export default function useTimelineReorderDnD({
     orderIds.forEach((id) => {
       const el = itemElById.get(id);
       if (!el) return;
+      if (id === activeId) {
+        el.style.transform = "";
+        el.style.willChange = "";
+        // Avoid fighting the active row's opacity transition.
+        return;
+      }
+      // Keep the transform transition so rows glide back into their slots
+      // instead of snapping (e.g. dragging back into the dead zone).
+      if (!el.style.transition) {
+        el.style.transition = `transform ${PREVIEW_MS}ms ease`;
+      }
       el.style.transform = "";
       el.style.willChange = "";
-      // Avoid fighting the active row's opacity transition.
-      if (id !== activeId) el.style.transition = "";
     });
     reorderPreviewRef.current.lastPreviewOrderIds = null;
   };
@@ -283,6 +349,139 @@ export default function useTimelineReorderDnD({
     });
     reorderPreviewRef.current.lastPreviewOrderIds = null;
   };
+
+  // Hands the drag visuals (preview transforms + the floating ghost) over to
+  // the rows as they are laid out *right now*, without any visible step:
+  // every row is first pinned to where it currently *looks* like it is
+  // (FLIP invert), then released to its real slot with one short transition.
+  //
+  // Called in two situations, both of which have final layout in place:
+  // - after React painted the reordered list (see the layout effect below)
+  // - on a cancelled drag, where the layout never changed
+  const finishReorderVisuals = ({ activeId, flash = false } = {}) => {
+    if (rafPreviewRef.current != null) {
+      cancelAnimationFrame(rafPreviewRef.current);
+      rafPreviewRef.current = null;
+    }
+
+    const listEl = listElRef?.current ?? null;
+    const { itemElById, orderIds, topById } = reorderPreviewRef.current;
+    const ghostRect = clonedElementRef.current
+      ? clonedElementRef.current.getBoundingClientRect()
+      : null;
+
+    const invertById = new Map();
+    orderIds.forEach((id) => {
+      const el = itemElById.get(id);
+      if (!el) return;
+      if (id === activeId) {
+        // The ghost is what the user sees being dragged, so the real row takes
+        // over from the ghost's position rather than from its own old slot.
+        // (The active row never carries a preview transform, so its rect is
+        // its untransformed slot.)
+        invertById.set(
+          id,
+          ghostRect ? ghostRect.top - el.getBoundingClientRect().top : 0,
+        );
+        return;
+      }
+      // `offsetTop` ignores transforms, so cached top + the in-flight
+      // translate is where the row is painted, and the fresh `offsetTop` is
+      // where it belongs now.
+      const paintedTop = (topById.get(id) ?? el.offsetTop) + getTranslateY(el);
+      invertById.set(id, paintedTop - el.offsetTop);
+    });
+
+    invertById.forEach((invert, id) => {
+      const el = itemElById.get(id);
+      if (!el) return;
+      el.style.transition = "none";
+      el.style.transform = invert ? `translateY(${invert}px)` : "";
+      if (id === activeId) {
+        el.style.opacity = "";
+        el.style.visibility = "";
+      }
+    });
+
+    cleanupClone();
+
+    if (listEl) {
+      // Flush the inverted transforms so the release below animates from them.
+      // eslint-disable-next-line no-unused-expressions
+      listEl.offsetHeight;
+    }
+
+    const settleMs = prefersReducedMotion() ? 0 : SETTLE_MS;
+    const settlingIds = [];
+    invertById.forEach((invert, id) => {
+      const el = itemElById.get(id);
+      if (!el) return;
+      if (!invert || !settleMs) {
+        el.style.transition = "";
+        el.style.willChange = "";
+        el.style.transform = "";
+        return;
+      }
+      el.style.transition = `transform ${settleMs}ms cubic-bezier(0.2, 0.8, 0.2, 1)`;
+      el.style.willChange = "transform";
+      el.style.transform = "";
+      settlingIds.push(id);
+    });
+
+    reorderPreviewRef.current.lastPreviewOrderIds = null;
+
+    if (settleTimerRef.current != null) clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = null;
+    if (settlingIds.length) {
+      settleTimerRef.current = setTimeout(() => {
+        settleTimerRef.current = null;
+        settlingIds.forEach((id) => {
+          const el = itemElById.get(id);
+          if (!el) return;
+          el.style.transition = "";
+          el.style.willChange = "";
+        });
+      }, settleMs + 40);
+    }
+
+    if (flash && activeId) flashDroppedRow(activeId);
+  };
+
+  const abandonHandoff = () => {
+    const pending = postCommitRef.current;
+    if (!pending) return;
+    postCommitRef.current = null;
+    if (handoffTimerRef.current != null) {
+      clearTimeout(handoffTimerRef.current);
+      handoffTimerRef.current = null;
+    }
+    finishReorderVisuals({ activeId: pending.activeId });
+  };
+
+  useLayoutEffect(() => {
+    const pending = postCommitRef.current;
+    if (!pending?.expectedOrderKey) return;
+    if (getOrderKey(timeLines) !== pending.expectedOrderKey) return;
+
+    // React has mutated the DOM but nothing is painted yet: this is the one
+    // moment where dropping the preview transforms is invisible.
+    postCommitRef.current = null;
+    if (handoffTimerRef.current != null) {
+      clearTimeout(handoffTimerRef.current);
+      handoffTimerRef.current = null;
+    }
+
+    if (activeIdRef.current) {
+      // A new drag started before the commit landed — its cached geometry now
+      // describes the old layout, so rebuild it instead of settling.
+      resetReorderPreviewStyles({});
+      buildReorderPreviewCache();
+      return;
+    }
+
+    finishReorderVisuals({ activeId: pending.activeId, flash: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLines]);
 
   const applyDraggedRowFade = ({ activeId, overId, yInList }) => {
     const listEl = listElRef?.current ?? null;
@@ -434,7 +633,7 @@ export default function useTimelineReorderDnD({
           return;
         }
         const delta = deltas?.[id] ?? 0;
-        el.style.transition = "transform 120ms ease";
+        el.style.transition = `transform ${PREVIEW_MS}ms ease`;
         el.style.willChange = delta ? "transform" : "";
         el.style.transform = delta ? `translateY(${delta}px)` : "";
       });
@@ -605,6 +804,23 @@ export default function useTimelineReorderDnD({
   };
 
   const handleDragStartTimeLine = (e, item) => {
+    // A drag started on top of the previous one's settle/handoff: drop the
+    // leftover styles so the geometry cache below measures real slots.
+    if (postCommitRef.current || settleTimerRef.current != null) {
+      const stalledActiveId = postCommitRef.current?.activeId ?? null;
+      postCommitRef.current = null;
+      if (handoffTimerRef.current != null) {
+        clearTimeout(handoffTimerRef.current);
+        handoffTimerRef.current = null;
+      }
+      if (settleTimerRef.current != null) {
+        clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
+      cleanupClone();
+      resetReorderPreviewStyles({ activeId: stalledActiveId });
+    }
+
     const dragEl =
       e?.currentTarget?.closest?.(".time-line-item") ?? e.currentTarget;
     e.dataTransfer.effectAllowed = "move";
@@ -778,13 +994,18 @@ export default function useTimelineReorderDnD({
       .querySelectorAll(".time-line-item.over")
       .forEach((el) => el.classList.remove("over"));
 
-    cleanupClone();
-    resetReorderPreviewStyles({ activeId: activeIdRef.current });
     pendingOverIdRef.current = null;
     acceptedOverIdRef.current = null;
     if (rafPreviewRef.current != null) {
       cancelAnimationFrame(rafPreviewRef.current);
       rafPreviewRef.current = null;
+    }
+
+    // With a reorder on its way, the ghost and the preview transforms are kept
+    // until the reordered rows are laid out (see the layout effect); tearing
+    // them down here is what used to snap the list back to its old order.
+    if (!postCommitRef.current) {
+      finishReorderVisuals({ activeId: activeIdRef.current });
     }
 
     activeIdRef.current = null;
@@ -806,12 +1027,13 @@ export default function useTimelineReorderDnD({
       overId: overIdRef.current,
     });
 
-    // Cleanup preview visuals; actual reorder commit is deferred.
+    // Preview visuals are intentionally left alone: they already show the
+    // dropped order, and `dragend` (or the post-commit layout effect) settles
+    // them.
     overIdRef.current = null;
     lastHomeXCssRef.current = null;
     pendingOverIdRef.current = null;
     acceptedOverIdRef.current = null;
-    resetReorderPreviewStyles({ activeId: activeIdRef.current });
   };
 
   return {
