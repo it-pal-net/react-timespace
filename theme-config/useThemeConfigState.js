@@ -13,6 +13,11 @@ const TIMESPACES_COLOR_KEYS = [
   "intervalHandBody",
 ];
 
+// `text` paints the timeline, so it sits with the other timespace colors
+// instead of alone in its own App card. Host apps that hide the timespace
+// sections keep it in the App colors — otherwise it would have nowhere to go.
+const SHARED_TEXT_COLOR_KEY = "text";
+
 export default function useThemeConfigState({
   excludedThemeNames = [],
   showTimespaceRenderingControls = true,
@@ -56,19 +61,26 @@ export default function useThemeConfigState({
       ),
     [theme.color, excludedColorKeys],
   );
+  const timespaceColorKeys = useMemo(
+    () =>
+      showTimespaceRenderingControls
+        ? [SHARED_TEXT_COLOR_KEY, ...TIMESPACES_COLOR_KEYS]
+        : TIMESPACES_COLOR_KEYS,
+    [showTimespaceRenderingControls],
+  );
   const appThemeColorKeys = useMemo(
     () =>
       themeColorVariables.filter(
-        (colorVar) => !TIMESPACES_COLOR_KEYS.includes(colorVar),
+        (colorVar) => !timespaceColorKeys.includes(colorVar),
       ),
-    [themeColorVariables],
+    [themeColorVariables, timespaceColorKeys],
   );
   const timespaceThemeColorKeys = useMemo(
     () =>
       themeColorVariables.filter((colorVar) =>
-        TIMESPACES_COLOR_KEYS.includes(colorVar),
+        timespaceColorKeys.includes(colorVar),
       ),
-    [themeColorVariables],
+    [themeColorVariables, timespaceColorKeys],
   );
 
   const themesOptions = useMemo(() => {
