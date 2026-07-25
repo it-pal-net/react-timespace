@@ -185,13 +185,9 @@ function ThemeConfig({
           </>
         ) : (
           <>
-            <S.ConfigGroup>
-              <S.GroupHeading>
-                <AppWindow size={14} />
-                App
-              </S.GroupHeading>
-              {appTabBody}
-            </S.ConfigGroup>
+            {/* No "App" heading here: the flat layout is one widget's theme,
+                so its own basics need no group label to stand apart from. */}
+            <S.ConfigGroup>{appTabBody}</S.ConfigGroup>
             {timespacesTabBody && (
               <S.ConfigGroup>
                 <S.GroupHeading>
