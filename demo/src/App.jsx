@@ -13,7 +13,9 @@ import {
   addTimeInterval,
 } from "react-timespace";
 import ThemeConfig from "react-timespace/theme-config";
-import useLocalStorage from "react-timespace/hooks/useLocalStorage";
+// Internal helper, not part of the package's public API — the demo reaches
+// into the sources next to it rather than importing a published subpath.
+import useLocalStorage from "../../hooks/useLocalStorage";
 
 const REPO_URL = "https://github.com/it-pal-net/react-timespace";
 

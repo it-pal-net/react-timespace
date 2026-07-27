@@ -236,7 +236,10 @@ TimeLine.propTypes = {
   isEmpty: PropTypes.bool,
   hoursElRef: PropTypes.oneOfType([
     PropTypes.func,
-    PropTypes.shape({ current: PropTypes.instanceOf(Element) }),
+    // `current` stays untyped on purpose: naming the DOM `Element` global here
+    // is evaluated at import time and would throw when the package is loaded
+    // on a server (SSR / Next.js), where no DOM exists.
+    PropTypes.shape({ current: PropTypes.any }),
   ]),
   color: PropTypes.string,
   // Optional clock tick (epoch seconds) used to keep styling in sync over time.

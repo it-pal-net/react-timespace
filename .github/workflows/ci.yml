@@ -19,6 +19,7 @@ jobs:
           node-version: 24
       - run: npm install
       - run: npm test
+      - run: npm run build
 
   demo-build:
     runs-on: ubuntu-latest

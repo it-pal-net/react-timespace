@@ -37,6 +37,11 @@ npm install react-timespace
 React 18+ is a peer dependency. Styling uses Emotion (bundled as a regular
 dependency — your app does not need to use Emotion).
 
+The package ships as ESM only, pre-built and ready for any bundler (Vite,
+webpack, Next.js, Rspack, Parcel). Every component is client-side, so the
+build carries a `"use client"` banner for React Server Component setups.
+`require()` works from Node 22.12 on.
+
 ## Quick start
 
 ```jsx
@@ -186,10 +191,14 @@ in sync. Attributes: `data-zones` (comma-separated IANA ids), `data-theme`
 ## Local development
 
 ```sh
-npm install        # package deps + vitest
+npm install        # package deps + build/test tooling
 npm test           # pure-core unit tests
+npm run build      # bundle the package into dist/ (what npm publishes)
 cd demo && npm install && npm run dev   # local playground on vite
 ```
+
+The demo resolves `react-timespace` to the sources next to it, not to
+`dist/`, so there is no build step between an edit and the playground.
 
 The hosted playground lives at
 [synccontact.com/timespace](https://synccontact.com/timespace); `demo/` is

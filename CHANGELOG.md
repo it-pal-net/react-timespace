@@ -27,6 +27,20 @@ Time-interval drag rework — reliability, hit targets, and performance.
 - **Escape cancels a drag**, restoring positions from drag start;
   `pointercancel`/window `blur` end it safely.
 
+Packaging — this is the first version published to npm.
+
+- The package is **pre-built** (`npm run build`, Vite library mode) instead of
+  shipping raw JSX, so bundlers that don't transpile `node_modules` (webpack,
+  Next.js) can consume it. Output is ESM with source maps; `react`,
+  `react-dom`, Emotion, `lucide-react`, `prop-types` and `react-colorful` stay
+  external so the app resolves a single copy of each.
+- `exports` map with two entries: `react-timespace` and
+  `react-timespace/theme-config`, sharing one chunk so both see the same React
+  context instances.
+- `"use client"` banner for React Server Component consumers.
+- Fixed a crash when the package was imported without a DOM (SSR): a
+  `PropTypes.instanceOf(Element)` was evaluated at module load.
+
 ## 0.2.0
 
 Theming engine + theme configurator (extracted from SyncContact).
