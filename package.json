@@ -4,12 +4,27 @@
   "description": "Multi-timezone timeline React component — drag time intervals across timezone rows with collision-resolved clock labels. Extracted from SyncContact.",
   "type": "module",
   "sideEffects": false,
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "main": "./index.js",
+  "module": "./index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./theme-config": "./dist/theme-config.js",
+    ".": "./index.js",
+    "./theme-config": "./theme-config/index.js",
+    "./theming": "./theming/index.js",
+    "./tzOptions": "./tzOptions.js",
+    "./state/actions": "./state/actions.js",
+    "./state/actionTypes": "./state/actionTypes.js",
+    "./state/keyValueReducer": "./state/keyValueReducer.js",
+    "./state/timeZonesProvider": "./state/timeZonesProvider.jsx",
     "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "exports": {
+      ".": "./dist/index.js",
+      "./theme-config": "./dist/theme-config.js",
+      "./package.json": "./package.json"
+    }
   },
   "files": [
     "dist",
