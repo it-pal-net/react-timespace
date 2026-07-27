@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Timespace embed — CSP test harness</title>
+
+    <!--
+      This bootstrap MUST stay the first script in <head>: a meta CSP only
+      governs content parsed *after* it, so it has to be written before the
+      loader script tag or the direct iframe exist.
+
+      Every preset keeps script-src 'unsafe-inline' + style-src 'unsafe-inline'
+      so this harness itself keeps running under its own policy. 'unsafe-inline'
+      only whitelists *inline* code — it never allows an external src, so the
+      embed.js host check below is still a real test.
+
+      Caveat: frame-ancestors / report-uri / sandbox are ignored in a meta CSP.
+      frame-ancestors is enforced by the *framed* page (synccontact.com), so it
+      can only be tested against the real response header — see the notes panel.
+    -->
+    <script>
+      (function () {
+        var SELF = "'self' 'unsafe-inline'";
+        var POLICIES = {
+          off: null,
+          strict:
+            "default-src 'self'; script-src " +
+            SELF +
+            "; style-src " +
+            SELF +
+            "; frame-src 'none'",
+          "script-ok":
+            "default-src 'self'; script-src " +
+            SELF +
+            " https://synccontact.com; style-src " +
+            SELF +
+            "; frame-src 'none'",
+          "wildcard-trap":
+            "default-src 'self'; script-src " +
+            SELF +
+            " https://*.synccontact.com; style-src " +
+            SELF +
+            "; frame-src https://*.synccontact.com",
+          correct:
+            "default-src 'self'; script-src " +
+            SELF +
+            " https://synccontact.com; style-src " +
+            SELF +
+            "; frame-src https://synccontact.com",
+        };
+
+        var params = new URLSearchParams(location.search);
+        var preset = params.get("csp") || "off";
+        var policy = POLICIES[preset];
+
+        window.__harness = {
+          preset: preset,
+          policy: policy,
+          policies: POLICIES,
+          violations: [],
+          messages: [],
+        };
+
+        // Registered before anything embeddable is parsed so no violation is missed.
+        document.addEventListener("securitypolicyviolation", function (e) {
+          window.__harness.violations.push({
+            directive: e.effectiveDirective || e.violatedDirective,
+            blockedURI: e.blockedURI,
+            disposition: e.disposition,
+            sourceFile: e.sourceFile,
+            line: e.lineNumber,
+          });
+          if (window.__renderViolations) window.__renderViolations();
+        });
+
+        if (policy) {
+          document.write(
+            '<meta http-equiv="Content-Security-Policy" content="' +
+              policy +
+              '">',
+          );
+        }
+      })();
+    </script>
+
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --panel: #f6f7f9;
+        --border: #d8dce3;
+        --text: #14181f;
+        --muted: #5c6675;
+        --ok: #0d7a3e;
+        --bad: #c02626;
+        --warn: #9a6200;
+        --accent: #2f5fd0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1216;
+          --panel: #171b21;
+          --border: #2a313a;
+          --text: #e6e9ee;
+          --muted: #97a1b0;
+          --ok: #4ec97e;
+          --bad: #ff6b6b;
+          --warn: #e0a44a;
+          --accent: #7aa2f7;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 0 0 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+      .sub {
+        color: var(--muted);
+        margin: 0 0 24px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 16px;
+      }
+      code,
+      pre,
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+      pre {
+        overflow-x: auto;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px;
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .presets a {
+        display: block;
+        padding: 6px 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        text-decoration: none;
+        color: var(--text);
+        background: var(--bg);
+      }
+      .presets a.on {
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .expect {
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-end;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--text);
+      }
+      input[name="zones"] {
+        min-width: 320px;
+      }
+      button {
+        cursor: pointer;
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      td {
+        padding: 4px 0;
+        vertical-align: top;
+      }
+      td:first-child {
+        color: var(--muted);
+        width: 130px;
+        white-space: nowrap;
+        padding-right: 12px;
+      }
+      .ok {
+        color: var(--ok);
+        font-weight: 600;
+      }
+      .bad {
+        color: var(--bad);
+        font-weight: 600;
+      }
+      .warn {
+        color: var(--warn);
+        font-weight: 600;
+      }
+      .log {
+        max-height: 240px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+      }
+      .log .row {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .log .row:last-child {
+        border-bottom: 0;
+      }
+      .log .empty {
+        padding: 12px;
+        color: var(--muted);
+      }
+      .mount {
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+        padding: 8px;
+        min-height: 80px;
+        background: var(--bg);
+      }
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <h1>Timespace embed — CSP test harness</h1>
+      <p class="sub">
+        Loads the real hosted widget from
+        <code>https://synccontact.com/timespace/embed.js</code> under a
+        simulated host-page CSP, and reports what the browser blocked.
+      </p>
+
+      <div class="panel">
+        <h2>Host-page CSP preset</h2>
+        <div class="presets" id="presets"></div>
+        <p class="expect" id="expect"></p>
+        <pre id="policy"></pre>
+      </div>
+
+      <div class="panel">
+        <h2>Embed configuration</h2>
+        <form id="config">
+          <label
+            >data-zones
+            <input name="zones" value="Europe/Berlin,America/New_York,Asia/Bangkok" />
+          </label>
+          <label
+            >data-theme
+            <select name="theme">
+              <option>dark</option>
+              <option>light</option>
+            </select>
+          </label>
+          <label
+            >data-height
+            <input name="height" value="380" size="6" />
+          </label>
+          <button type="submit">Reload</button>
+        </form>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Diagnostics</h2>
+          <table>
+            <tbody id="diag"></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>CSP violations</h2>
+          <div class="log" id="violations"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>postMessage from synccontact.com (height sync)</h2>
+        <div class="log" id="messages"></div>
+      </div>
+
+      <div class="panel">
+        <h2>A · Loader script (the documented embed)</h2>
+        <div class="mount" id="mount-loader"></div>
+      </div>
+
+      <div class="panel">
+        <h2>B · Direct iframe (isolates frame-src from script-src)</h2>
+        <div class="mount" id="mount-iframe"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Live response headers (observed 2026-07-27, post-fix)</h2>
+        <p class="expect">
+          <code>https://synccontact.com/timespace-embed.html</code> — the page
+          the loader frames.
+        </p>
+        <pre id="ref"></pre>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var H = window.__harness;
+        var params = new URLSearchParams(location.search);
+        var ORIGIN = "https://synccontact.com";
+
+        var cfg = {
+          zones:
+            params.get("zones") ||
+            "Europe/Berlin,America/New_York,Asia/Bangkok",
+          theme: params.get("theme") || "dark",
+          height: params.get("height") || "380",
+        };
+
+        var EXPECT = {
+          off: "Baseline — no host CSP. Both A and B should render.",
+          strict:
+            "script-src blocks embed.js and frame-src 'none' blocks the iframe. A and B should both fail.",
+          "script-ok":
+            "embed.js is allowed but frame-src is 'none'. The script runs, the iframe it injects is blocked — the failure mode that looks like a broken widget with no script error.",
+          "wildcard-trap":
+            "Allows *.synccontact.com only. A wildcard subdomain does NOT match the apex synccontact.com, so both should still be blocked.",
+          correct:
+            "The policy a host page actually needs. Both A and B should render.",
+        };
+
+        var LABELS = {
+          off: "off (baseline)",
+          strict: "strict",
+          "script-ok": "script ok / frame blocked",
+          "wildcard-trap": "*.synccontact.com trap",
+          correct: "correct",
+        };
+
+        // --- preset links ------------------------------------------------
+        var presets = document.getElementById("presets");
+        Object.keys(H.policies).forEach(function (key) {
+          var a = document.createElement("a");
+          var next = new URLSearchParams(params);
+          next.set("csp", key);
+          a.href = "?" + next.toString();
+          a.textContent = LABELS[key];
+          if (key === H.preset) a.className = "on";
+          presets.appendChild(a);
+        });
+        document.getElementById("expect").textContent = EXPECT[H.preset] || "";
+        document.getElementById("policy").textContent =
+          H.policy || "(no Content-Security-Policy meta tag on this page)";
+
+        // --- config form -------------------------------------------------
+        var form = document.getElementById("config");
+        form.zones.value = cfg.zones;
+        form.theme.value = cfg.theme;
+        form.height.value = cfg.height;
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var next = new URLSearchParams();
+          next.set("csp", H.preset);
+          next.set("zones", form.zones.value);
+          next.set("theme", form.theme.value);
+          next.set("height", form.height.value);
+          location.search = next.toString();
+        });
+
+        // --- diagnostics -------------------------------------------------
+        var state = {
+          "Page origin": location.origin,
+          "CSP preset": H.preset,
+          "A · script load": "pending…",
+          "A · iframe element": "pending…",
+          "A · iframe content": "pending…",
+          "A · iframe height": "—",
+          "B · iframe content": "pending…",
+          "Height messages": "0",
+        };
+
+        // Detecting whether a frame really loaded is trickier than it looks:
+        //   - a CSP-blocked frame still fires `load` (blocked -> about:blank),
+        //     so the load event proves nothing;
+        //   - reading contentWindow.location throws for a blocked frame just
+        //     like it does for a genuine cross-origin one, so that lies too.
+        // The one unambiguous signal is the widget's own height handshake. The
+        // embed page posts {type:"timespace:height", id} with the embedId it
+        // was given, so each frame confirms itself independently.
+        var frameSeen = {};
+        var refreshers = [];
+
+        function refreshAll() {
+          refreshers.forEach(function (fn) {
+            fn();
+          });
+        }
+
+        function frameStatus(id) {
+          if (id && frameSeen[id] !== undefined) {
+            return ["live — height sync " + frameSeen[id] + "px", "ok"];
+          }
+          var framed = H.violations.some(function (v) {
+            return String(v.directive).indexOf("frame-src") === 0;
+          });
+          if (framed) return ["BLOCKED by frame-src", "bad"];
+          return ["no height message yet", "warn"];
+        }
+
+        function set(key, value, cls) {
+          state[key] = cls ? '<span class="' + cls + '">' + value + "</span>" : value;
+          renderDiag();
+        }
+
+        function renderDiag() {
+          document.getElementById("diag").innerHTML = Object.keys(state)
+            .map(function (k) {
+              return "<tr><td>" + k + "</td><td>" + state[k] + "</td></tr>";
+            })
+            .join("");
+        }
+        renderDiag();
+
+        function renderLog(el, rows, empty) {
+          if (!rows.length) {
+            el.innerHTML = '<div class="empty">' + empty + "</div>";
+            return;
+          }
+          el.innerHTML = rows.join("");
+          el.scrollTop = el.scrollHeight;
+        }
+
+        window.__renderViolations = function () {
+          renderLog(
+            document.getElementById("violations"),
+            H.violations.map(function (v) {
+              return (
+                '<div class="row mono"><span class="bad">' +
+                v.directive +
+                "</span> blocked <b>" +
+                v.blockedURI +
+                "</b>" +
+                (v.sourceFile ? "<br>" + v.sourceFile + ":" + v.line : "") +
+                "</div>"
+              );
+            }),
+            "No violations reported.",
+          );
+          refreshAll();
+        };
+        window.__renderViolations();
+
+        function renderMessages() {
+          renderLog(
+            document.getElementById("messages"),
+            H.messages.map(function (m) {
+              return '<div class="row mono">' + m + "</div>";
+            }),
+            "Nothing received yet. The loader resizes the iframe from these.",
+          );
+        }
+        renderMessages();
+
+        window.addEventListener("message", function (e) {
+          if (e.origin !== ORIGIN) return;
+          var d = e.data || {};
+          H.messages.push(
+            JSON.stringify(d) + "  ← " + e.origin,
+          );
+          if (d.type === "timespace:height") {
+            frameSeen[d.id] = d.height;
+            set("Height messages", String(H.messages.length));
+          }
+          renderMessages();
+          refreshAll();
+        });
+
+        // --- A · the documented loader -----------------------------------
+        // Injected rather than hardcoded so the data-* attributes stay
+        // configurable. document.currentScript is set for dynamically inserted
+        // classic scripts, which is what the loader reads.
+        var mountA = document.getElementById("mount-loader");
+        var script = document.createElement("script");
+        script.src = ORIGIN + "/timespace/embed.js";
+        script.setAttribute("data-zones", cfg.zones);
+        script.setAttribute("data-theme", cfg.theme);
+        script.setAttribute("data-height", cfg.height);
+        script.onload = function () {
+          set("A · script load", "loaded", "ok");
+          checkInjection();
+        };
+        script.onerror = function () {
+          set("A · script load", "BLOCKED / failed", "bad");
+          set("A · iframe element", "n/a — script never ran", "bad");
+          set("A · iframe content", "n/a — script never ran", "bad");
+        };
+        mountA.appendChild(script);
+
+        function checkInjection() {
+          var iframe = mountA.querySelector("iframe");
+          if (!iframe) {
+            set("A · iframe element", "no iframe in the DOM", "bad");
+            set("A · iframe content", "n/a — nothing injected", "bad");
+            return;
+          }
+          set("A · iframe element", "injected — " + iframe.src, "ok");
+          var embedId = new URL(iframe.src).searchParams.get("embedId");
+          function refresh() {
+            var probe = frameStatus(embedId);
+            set("A · iframe content", probe[0], probe[1]);
+            set("A · iframe height", iframe.style.height);
+          }
+          refreshers.push(refresh);
+          iframe.addEventListener("load", refresh);
+          setInterval(refresh, 1000);
+          refresh();
+        }
+
+        // --- B · direct iframe -------------------------------------------
+        var mountB = document.getElementById("mount-iframe");
+        var direct = document.createElement("iframe");
+        direct.src =
+          ORIGIN +
+          "/timespace-embed.html?embedId=direct-test&zones=" +
+          encodeURIComponent(cfg.zones) +
+          "&theme=" +
+          encodeURIComponent(cfg.theme);
+        direct.title = "Timespace direct iframe";
+        direct.style.cssText =
+          "display:block;width:100%;border:0;height:" + cfg.height + "px";
+        function refreshB() {
+          var probe = frameStatus("direct-test");
+          set("B · iframe content", probe[0], probe[1]);
+        }
+        refreshers.push(refreshB);
+        direct.addEventListener("load", refreshB);
+        mountB.appendChild(direct);
+        refreshB();
+
+        setTimeout(function () {
+          ["A · iframe element", "A · iframe content", "B · iframe content"].forEach(
+            function (key) {
+              if (String(state[key]).indexOf("pending") !== -1) {
+                set(key, "still pending after 6s — treat as failed", "bad");
+              }
+            },
+          );
+        }, 6000);
+
+        document.getElementById("ref").textContent = [
+          "content-security-policy: default-src 'none';",
+          "  frame-src 'self' *.synccontact.com;   <- 'self' added 2026-07-27; the bare",
+          "     wildcard did not match the apex synccontact.com",
+          "  script-src 'self' 'unsafe-eval' 'unsafe-inline' … ; style-src 'self' 'unsafe-inline' … ;",
+          "  img-src 'self' data: blob: … ; font-src 'self' data: fonts.gstatic.com; object-src 'none';",
+          "strict-transport-security: max-age=31536000; includeSubDomains; preload",
+          "cache-control: max-age=60,must-revalidate",
+          "vary: Origin",
+          "",
+          "NOTE: no frame-ancestors directive and no x-frame-options header.",
+          "frame-ancestors does NOT fall back to default-src, so 'none' above does",
+          "not restrict framing — third-party embedding is currently allowed.",
+        ].join("\n");
+      })();
+    </script>
+  </body>
+</html>
