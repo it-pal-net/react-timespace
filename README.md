@@ -186,7 +186,19 @@ Don't use React? Drop the hosted widget into any page:
 
 The loader injects an iframe right after the script tag and keeps its height
 in sync. Attributes: `data-zones` (comma-separated IANA ids), `data-theme`
-(`light` | `dark`), `data-height` (initial px height).
+(`light` | `dark`), `data-height` (initial px height), `data-zen` (`0` to
+opt out of Zen mode).
+
+The embed renders in Zen mode: just the timelines, no controls row and no
+per-row extras. Dragging intervals and rows still works — it's the chrome
+that's gone, on the assumption a widget on someone else's page should look
+like part of that page. `data-zen="0"` restores the add-zone/add-interval
+buttons and the drag hint.
+
+The attribution sits in the bottom corner, dimmed until hovered, next to a
+small toggle that lets a visitor bring the controls up for themselves. The
+toggle is view-only state — a reload returns the embed to whatever `data-zen`
+says.
 
 ## Local development
 
