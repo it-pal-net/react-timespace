@@ -438,6 +438,7 @@
           "A · iframe content": "pending…",
           "A · iframe height": "—",
           "B · iframe content": "pending…",
+          "B · iframe height": "—",
           "Height messages": "0",
         };
 
@@ -588,11 +589,21 @@
           "&theme=" +
           encodeURIComponent(cfg.theme);
         direct.title = "Timespace direct iframe";
+        // data-height is only the starting height, exactly as it is for the
+        // loader — the widget's own handshake decides the final one below.
         direct.style.cssText =
           "display:block;width:100%;border:0;height:" + cfg.height + "px";
         function refreshB() {
           var probe = frameStatus("direct-test");
           set("B · iframe content", probe[0], probe[1]);
+          // No loader here to consume the handshake, so the harness applies it
+          // itself. Without this the frame stays pinned at data-height and
+          // leaves dead space under a shorter widget (380 given, 306 reported).
+          // Resizing is a host-page concern, not a CSP one, so B still isolates
+          // frame-src from script-src.
+          var reported = frameSeen["direct-test"];
+          if (reported !== undefined) direct.style.height = reported + "px";
+          set("B · iframe height", direct.style.height);
         }
         refreshers.push(refreshB);
         direct.addEventListener("load", refreshB);

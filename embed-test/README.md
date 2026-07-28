@@ -23,7 +23,11 @@ Two mounts, so a failure can be attributed:
 - **A · loader script** — the documented `<script src=".../embed.js" data-*>`
   integration. Exercises `script-src` *and* `frame-src`.
 - **B · direct iframe** — frames `/timespace-embed.html` itself, no loader.
-  Exercises `frame-src` alone, so you can tell the two apart.
+  Exercises `frame-src` alone, so you can tell the two apart. With no loader to
+  consume the height handshake, the harness applies it to this frame itself —
+  otherwise `data-height` stays a fixed height and leaves dead space under a
+  shorter widget (380 given, 306 reported). Resizing is a host-page concern, not
+  a CSP one, so B still isolates `frame-src` from `script-src`.
 
 Switch host policies with `?csp=`:
 
