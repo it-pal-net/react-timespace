@@ -326,12 +326,17 @@ export const Hour = styled.div`
     !isEmpty &&
     isDayStart &&
     css`
+      /* Flush with the hour cell, not overhanging it: the hour strip is the
+         last thing in a row, so a vertical bleed here is scrollable overflow
+         below the last row and gives the overflow:auto TimeLineList a
+         scrollbar with nothing to scroll. The gradient already fades out at
+         both ends, so the 3px overhang this used to have was invisible. */
       &::after {
         content: "";
         position: absolute;
         left: -1px;
-        top: -3px;
-        bottom: -3px;
+        top: 0;
+        bottom: 0;
         width: 2px;
         border-radius: 2px;
         pointer-events: none;

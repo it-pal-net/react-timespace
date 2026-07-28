@@ -452,7 +452,7 @@ const TimeLineRow = ({
         </Fragment>
       ))}
       <S.TimePointBody
-        className="timeline-now-line"
+        className="timeline-now-line timeline-now-line-segment"
         style={{
           position: "absolute",
           height: "100%",

@@ -32,6 +32,16 @@ const timelineNowLineStyles = css`
     animation: ${timelineNowPulse} 3.8s ease-in-out infinite;
   }
 
+  /* The per-row segments (TimeLineRow) render *inside* TimeLineList, which is
+     overflow:auto. A glow that bleeds below the last row is scrollable
+     overflow, so the list grows a scrollbar (and the host iframe a scroll
+     thumb) even when every row fits exactly. Keep the horizontal spread — the
+     vertical one is invisible against the neighbouring segments anyway. */
+  &.timeline-now-line.timeline-now-line-segment::after {
+    top: 0;
+    bottom: 0;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     &.timeline-now-line {
       animation: none;
