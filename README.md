@@ -7,8 +7,9 @@ meetings, hand-offs, or focus blocks that work for everyone.
 Extracted from (and battle-tested in) [SyncContact](https://synccontact.com),
 where it powers the Time Zones view.
 
-**Live demo:** <https://synccontact.com/timespace> · or embed it anywhere
-with one script tag (see [Embedding](#embedding)).
+**Live demo:** <https://synccontact.com/timespace> ·
+**embed sandbox:** <https://synccontact.com/timespace-embed> · or embed it
+anywhere with one script tag (see [Embedding](#embedding)).
 
 ## Features
 
@@ -205,7 +206,9 @@ back to sensible mode-aware defaults, so it drops into any app.
 
 ## Embedding
 
-Don't use React? Drop the hosted widget into any page:
+Don't use React? Drop the hosted widget into any page. There's a sandbox at
+[synccontact.com/timespace-embed](https://synccontact.com/timespace-embed) to
+play with the attributes below before you paste anything into your own page:
 
 ```html
 <script
