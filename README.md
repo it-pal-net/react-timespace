@@ -1,5 +1,8 @@
 # react-timespace
 
+[![npm version](https://img.shields.io/npm/v/react-timespace.svg)](https://www.npmjs.com/package/react-timespace)
+[![npm downloads](https://img.shields.io/npm/dm/react-timespace.svg)](https://www.npmjs.com/package/react-timespace)
+
 A multi-timezone timeline for React. Render the day as horizontal timelines —
 one per time zone — and drag a shared **time interval** across them to plan
 meetings, hand-offs, or focus blocks that work for everyone.
@@ -33,8 +36,18 @@ anywhere with one script tag (see [Embedding](#embedding)).
 
 ## Install
 
+Available on npm: <https://www.npmjs.com/package/react-timespace>
+
 ```sh
 npm install react-timespace
+```
+
+```sh
+yarn add react-timespace
+```
+
+```sh
+pnpm add react-timespace
 ```
 
 React 18+ is a peer dependency. Styling uses Emotion (bundled as a regular
