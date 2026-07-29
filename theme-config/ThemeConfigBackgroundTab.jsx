@@ -108,6 +108,7 @@ function ThemeConfigBackgroundTab({ state, actions }) {
         {effectiveFillMode === "image" && ImagePicker && (
           <S.CompactControl>
             <S.BackgroundPreviewCard
+              data-tsc-background-preview=""
               type="button"
               aria-label="Browse background images"
               aria-haspopup="dialog"

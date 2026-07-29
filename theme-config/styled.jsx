@@ -434,8 +434,8 @@ export const SectionHeaderActions = styled.div`
   opacity: 0.7;
   transition: opacity 150ms ease;
 
-  ${CompactSectionCard}:hover &,
-  ${CompactSectionCard}:focus-within & {
+  [data-tsc-section-card]:hover &,
+  [data-tsc-section-card]:focus-within & {
     opacity: 1;
   }
 `;
@@ -916,7 +916,7 @@ export const BackgroundPreviewFrame = styled.div`
     filter 160ms ease,
     transform 160ms ease;
 
-  ${BackgroundPreviewCard}:hover & {
+  [data-tsc-background-preview]:hover & {
     filter: brightness(1.04);
     border-color: rgba(38, 132, 255, 0.46);
     box-shadow: 0 0 0 2px rgba(38, 132, 255, 0.16);
@@ -1006,8 +1006,8 @@ export const BackgroundPreviewHoverOverlay = styled.div`
   pointer-events: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 
-  ${BackgroundPreviewCard}:hover &,
-  ${BackgroundPreviewCard}:focus-visible & {
+  [data-tsc-background-preview]:hover &,
+  [data-tsc-background-preview]:focus-visible & {
     opacity: 1;
   }
 `;

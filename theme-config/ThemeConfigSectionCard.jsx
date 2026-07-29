@@ -5,7 +5,7 @@ import * as S from "./styled";
 
 function ThemeConfigSectionCard({ title, onReset, canReset = true, children }) {
   return (
-    <S.CompactSectionCard>
+    <S.CompactSectionCard data-tsc-section-card="">
       <S.SectionHeader>
         <S.SectionHeaderTitle>{title}</S.SectionHeaderTitle>
         {onReset && (
