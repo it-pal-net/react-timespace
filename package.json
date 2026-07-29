@@ -1,6 +1,6 @@
 {
   "name": "react-timespace",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Multi-timezone timeline React component — drag time intervals across timezone rows with collision-resolved clock labels. Extracted from SyncContact.",
   "type": "module",
   "sideEffects": false,
@@ -36,7 +36,9 @@
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm test && npm run build"
+    "prepublishOnly": "npm test && npm run build",
+    "prepack": "node scripts/pack-fields.mjs apply",
+    "postpack": "node scripts/pack-fields.mjs restore"
   },
   "peerDependencies": {
     "react": ">=18",

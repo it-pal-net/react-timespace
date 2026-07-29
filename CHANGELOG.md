@@ -1,11 +1,56 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
-- Add per-timeline local availability windows and highlight common
-  cross-time-zone availability.
-- Keep view preferences out of the theme configurator so hosts can present
-  them in a dedicated settings surface.
+Availability windows, plus a split between view settings and theming.
+
+- **Per-timeline availability**: a timeline can declare an `availability`
+  window — `{ start: "08:00", end: "21:00" }`, an array of windows, or an
+  overnight window that wraps midnight. Times are local to that timeline's
+  `timeZone`; the row shades its available hours green.
+- **Cross-time-zone overlap**: when two or more rows declare availability,
+  the instants every declared window shares get a stronger highlight, so the
+  time that works for everyone is visible at a glance. Timelines without an
+  `availability` value sit out of the overlap calculation.
+- Availability is projected onto the home-zone day with a DST-safe zoned-day
+  conversion, sampled per minute, and recomputed only when the home-zone date
+  changes (not on every clock tick).
+- `calculateAvailabilityGrid`, `normalizeAvailability` and `isMinuteAvailable`
+  are exported for hosts that want the same math (e.g. to propose slots).
+
+### Breaking
+
+- **`ThemeConfig` no longer renders view preferences.** The Timespace display
+  section is gone, along with the `showGroupTimelinesControl`, `prefs` and
+  `onPrefsChange` props (and the internal `ThemeConfigTimespaceDisplay`). The
+  configurator now themes the widget and nothing else; hosts present clock /
+  seconds / time-format / grouping preferences on their own settings surface
+  and pass them to `Timespace` through its display props. Passing the removed
+  props is a no-op — remove them and move the controls.
+
+### Fixes
+
+- **No phantom scrollbar**: the now-line glow and the day-start divider no
+  longer bleed past their row. Both were scrollable overflow below the last
+  row, so `TimeLineList` (and an embedding iframe) grew a scrollbar with
+  nothing to scroll even when every row fit exactly.
+- **Linked/source consumers resolve subpaths again**: the committed `exports`
+  map points at the source entry points, so `npm link` and monorepo checkouts
+  can import `react-timespace/theming`, `/tzOptions` and `/state/*` with no
+  build step. A `prepack`/`postpack` pair swaps in the `dist` map while the
+  tarball is built, so the published package is unchanged — npm ignores
+  `publishConfig` field overrides, which would have shipped 0.3.0 pointing at
+  sources the tarball doesn't contain.
+
+### Docs & tooling
+
+- README documents availability, the embed sandbox at
+  [synccontact.com/timespace-embed](https://synccontact.com/timespace-embed),
+  and the embed's zen-by-default behaviour (`data-zen="0"` to opt out, plus
+  the corner toggle a visitor can flip for themselves).
+- `embed-test/` gains a host-page CSP harness that exercises the widget under
+  strict content-security policies, and the direct-iframe preset now resizes
+  from the height handshake.
 
 ## 0.2.1
 

@@ -3,6 +3,9 @@ dist/
 *.log
 *.tgz
 
+# Left behind only if a pack is interrupted between prepack and postpack.
+package.json.pack-backup
+
 # Per-developer Claude Code state: carries blanket tool permissions and a
 # trust flag that must not follow a clone. Shared commands live alongside it
 # in .claude/commands/ and are tracked.
