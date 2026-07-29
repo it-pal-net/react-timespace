@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+TypeScript declarations in the package, collective clock-label collision, and a
+theme-configurator style fix.
 
 ### Collision resolution
 
@@ -37,7 +40,19 @@
   declarations too, so linked checkouts and monorepos type-resolve as well.
   They stay out of the tarball, which still exposes `.` and `./theme-config`.
 
-### Docs
+### Fixes
+
+- **The theme configurator's hover styles no longer crash.** Several rules in
+  `theme-config` used Emotion component selectors
+  (`${CompactSectionCard}:hover &`), which only compile when
+  `@emotion/babel-plugin` runs over the source. The library builds with
+  `@vitejs/plugin-react` and no such transform, so interpolating one styled
+  component into another's template threw "Component selectors can only be used
+  in conjunction with @emotion/babel-plugin" in consuming apps. The affected
+  section-card and background-preview rules now key off `data-tsc-*` attributes
+  instead, and a test renders them to keep the transform-free path covered.
+
+### Docs & tooling
 
 - The roadmap listed several items that had already shipped — the packaged
   demo site and embed widget, the pre-built `dist/`, multiple simultaneous
@@ -45,6 +60,11 @@
   build the package deliberately does not do.
 - `onSetTimelinesOrder` is documented with its real signature: it takes no
   arguments, and the new order is read from `timeLines` on the context.
+- README links the published package from its badges and Install section, and
+  lists yarn/pnpm alongside npm.
+- Runtime dependencies are declared as caret ranges instead of exact pins, so a
+  host app that already has Emotion (or `prop-types`) resolves one shared copy
+  rather than installing a nested duplicate. Dev dependencies follow suit.
 
 ## 0.3.0
 
