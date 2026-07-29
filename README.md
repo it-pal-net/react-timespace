@@ -322,6 +322,10 @@ collision resolver, and the drag machinery — are documented in
 [ARCHITECTURE.md](./ARCHITECTURE.md). The pure math lives in `core/` and is
 unit-tested (`npm test`).
 
+For the story behind the implementation, including the failed approaches and
+state-management trade-offs, read
+[I needed a collision engine for a React timeline. Here is how I built it.](./docs/building-a-collision-engine-for-dom-labels.md)
+
 ---
 
 Issues and PRs welcome.
