@@ -43,8 +43,9 @@ Common fields used by the UI:
 
 ### `timeIntervals[]`
 
-Timespace currently treats the first interval as the "active one" for most
-auto-collision work.
+Timespace resolves all visible interval endpoints together with the live clock
+and row-name block. Each endpoint receives its own side and vertical stack
+lane, keyed by interval id.
 
 Common fields used by the UI:
 
@@ -82,8 +83,8 @@ persist `*DayOffsetSeconds`.
     constants, `formatDurationShort`
 
 - **`core/timeLineCollision.js`**
-  - pure-ish collision resolver: builds "boundary boxes", switches sides,
-    computes collision index lists
+  - pure-ish collision resolver: builds "boundary boxes" for every interval,
+    switches sides, computes collision index lists and assigns stack lanes
 
 - **`core/timelineReorderPreview.js`**
   - pure helpers for the row-reorder ghost preview
@@ -177,9 +178,6 @@ strips and the duration arrow.
   `ResizeObserver` on the list/header container (less global, fewer recalcs).
 - **DND**: consider switching to a library like `@dnd-kit` to remove DOM
   cloning and simplify reorder logic.
-- **Multiple intervals**: current "auto-collision pass" primarily uses
-  `timeIntervals[0]`. Supporting multiple intervals robustly needs extending
-  collision resolution and layout rules.
 - **Ultra-smooth interval dragging (commit-on-mouseup)**: keep a local "draft
   interval" during drag, render from that draft, and only commit to context on
   `mouseup` (optionally at a low frequency while dragging).

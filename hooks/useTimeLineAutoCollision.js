@@ -35,10 +35,10 @@ export default function useTimeLineAutoCollision({
     });
 
     const recalcIntervalsXPosFromDayOffset = (timeInterval) => {
-      const xPos1 = timeInterval.xPos1DayOffsetSeconds
+      const xPos1 = timeInterval.xPos1DayOffsetSeconds != null
         ? calculatePositionFromDayOffset(timeInterval.xPos1DayOffsetSeconds)
         : timeInterval.xPos1;
-      const xPos2 = timeInterval.xPos2DayOffsetSeconds
+      const xPos2 = timeInterval.xPos2DayOffsetSeconds != null
         ? calculatePositionFromDayOffset(timeInterval.xPos2DayOffsetSeconds)
         : timeInterval.xPos2;
 
@@ -55,23 +55,27 @@ export default function useTimeLineAutoCollision({
       };
     };
 
-    const timeInterval = timeIntervals.length
-      ? recalcIntervalsXPosFromDayOffset(timeIntervals[0])
-      : null;
+    const recalculatedIntervals = timeIntervals.map(
+      recalcIntervalsXPosFromDayOffset,
+    );
 
     const fixed = collider({
-      timeInterval,
+      timeIntervals: recalculatedIntervals,
       timeZonesClock: colliderState.timeZonesClock,
       timeLineName: {
         ...colliderState.timeLineName,
         side,
       },
     });
-    applyCollisionResolution(fixed, timeInterval);
+    applyCollisionResolution(fixed, recalculatedIntervals);
   }, [
     size.maxHeaderWidth,
     size.timeZonesClockWidth,
+    size.timeIntervalClockWidth,
     size.hoursLineWidth,
+    size.timeLineItemHeaderHeight,
+    size.leftOffset,
+    size.leftListOffset,
     colliderTrigger,
     timeIntervals.length,
   ]);

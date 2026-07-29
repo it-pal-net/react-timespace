@@ -327,7 +327,6 @@ unit-tested (`npm test`).
 Early extraction (0.x): the API may still move. Planned:
 
 - keyboard a11y for interval endpoints
-- collision-resolved labels for every interval, not just the first
 
 Issues and PRs welcome.
 

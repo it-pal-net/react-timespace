@@ -53,6 +53,7 @@ import { calculateAvailabilityGrid } from "./core/availability";
 const defaultColliderState = {
   side: "right",
   isCollided: null,
+  fontSize: "1em",
   zIndex: zIndexFloors.head,
   top: 0,
   scale: 1,
@@ -202,8 +203,7 @@ const Timespace = ({
       ...defaultColliderState,
       side: "left",
     },
-    timeIntervalXPos1: defaultColliderState,
-    timeIntervalXPos2: defaultColliderState,
+    timeIntervals: {},
   });
 
   const homeDayPassedXPosRef = useRef(0);
@@ -219,9 +219,9 @@ const Timespace = ({
   );
 
   const collider = useCallback(
-    ({ timeInterval, timeZonesClock, timeLineName }) =>
+    ({ timeIntervals: intervals, timeZonesClock, timeLineName }) =>
       resolveTimeLineCollisions({
-        timeInterval,
+        timeIntervals: intervals,
         timeZonesClock,
         timeLineName,
         size,
@@ -254,6 +254,10 @@ const Timespace = ({
     colliderTrigger: colliderTrigger + recomputeCollisionsKey,
   });
 
+  const requestCollisionResolution = useCallback(() => {
+    setColliderTrigger((current) => current + 1);
+  }, []);
+
   const { handlePointerMove, handlePointerUp, handleDragStartTimePoint } =
     useTimeIntervalDrag({
       tzState,
@@ -269,6 +273,7 @@ const Timespace = ({
       calculatePositionFromDayOffset,
       calculateDurationData,
       updateTimeInterval,
+      requestCollisionResolution,
     });
 
   const handleSetHomeZone = useCallback((timeZoneName) => {
@@ -294,6 +299,7 @@ const Timespace = ({
         }),
       );
     }
+    requestCollisionResolution();
   };
 
   // The "2h" duration label hangs `labelTailHeight` below the bottom of the

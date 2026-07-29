@@ -31,6 +31,7 @@ export default function useTimeIntervalDrag({
   calculatePositionFromDayOffset,
   calculateDurationData,
   updateTimeInterval,
+  requestCollisionResolution,
 }) {
   // Latest render values, readable from the stable window-level handlers.
   const latestRef = useRef(null);
@@ -44,6 +45,7 @@ export default function useTimeIntervalDrag({
     calculateSecondsFromStartOfDay,
     calculatePositionFromDayOffset,
     calculateDurationData,
+    requestCollisionResolution,
   };
 
   const capturedTimeIntervalIdRef = useRef(null);
@@ -156,12 +158,19 @@ export default function useTimeIntervalDrag({
       }),
     };
 
+    const collisionIntervals = state.timeIntervalsIds
+      .map((id) =>
+        id === capturedId
+          ? capturedIntervalDispatchData
+          : state.timeIntervalsMap[id],
+      )
+      .filter(Boolean);
     const fixed = colliderFn({
-      timeInterval: capturedIntervalDispatchData,
+      timeIntervals: collisionIntervals,
       timeZonesClock: colliderStateValue.timeZonesClock,
       timeLineName: colliderStateValue.timeLineName,
     });
-    applyResolution(fixed, capturedIntervalDispatchData);
+    applyResolution(fixed, collisionIntervals);
   }, []);
 
   const handlePointerMove = useCallback(
@@ -200,6 +209,7 @@ export default function useTimeIntervalDrag({
       calculateSecondsFromStartOfDay: toSeconds,
       calculatePositionFromDayOffset: toXPos,
       calculateDurationData: toDurationData,
+      requestCollisionResolution: requestResolution,
     } = latestRef.current;
 
     const capturedId = capturedTimeIntervalIdRef.current;
@@ -239,6 +249,7 @@ export default function useTimeIntervalDrag({
       };
     }
     tzDispatch(updateTimeInterval(updatedInterval));
+    requestResolution?.();
   }, [tzDispatch, updateTimeInterval, secondsInDay, cancelPendingMove]);
 
   const stopWindowDrag = useCallback(
@@ -257,6 +268,7 @@ export default function useTimeIntervalDrag({
       cancelPendingMove();
       if (drag?.snapshot?.id != null) {
         tzDispatch(updateTimeInterval({ ...drag.snapshot, mode: "fixed" }));
+        latestRef.current.requestCollisionResolution?.();
       }
     },
     [finishDrag, cancelPendingMove, tzDispatch, updateTimeInterval],

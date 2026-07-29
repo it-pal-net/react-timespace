@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Collision resolution
+
+- Clock labels for every visible interval now participate in one collective
+  collision pass. Overlapping endpoints from different intervals receive
+  independent side and stack-lane layouts instead of inheriting the first
+  interval's `xPos1`/`xPos2` layout.
+
 ### TypeScript types
 
 - **Declarations ship with the package.** `react-timespace` and

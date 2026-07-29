@@ -91,4 +91,80 @@ describe("core/timeLineCollision", () => {
     expect(tzClock.start).toBe(500);
     expect(tzClock.end).toBe(600);
   });
+
+  it("includes both endpoints from every interval", () => {
+    const fixed = resolveTimeLineCollisions({
+      timeIntervals: [
+        {
+          id: "ti-1",
+          xPos1: 250,
+          xPos2: 450,
+          xPos1ClockSide: "right",
+          xPos2ClockSide: "right",
+        },
+        {
+          id: "ti-2",
+          xPos1: 650,
+          xPos2: 850,
+          xPos1ClockSide: "right",
+          xPos2ClockSide: "right",
+        },
+      ],
+      timeZonesClock: { side: "right" },
+      timeLineName: { side: "left" },
+      size: makeSize({ maxHeaderWidth: 100 }),
+      homeDayPassedXPos: 550,
+      clockXTransformPercent: 0,
+    });
+
+    const intervalPoints = fixed
+      .filter((item) => item.type === "timeInterval")
+      .map(({ intervalId, pointName }) => `${intervalId}:${pointName}`);
+
+    expect(intervalPoints).toEqual([
+      "ti-1:xPos1",
+      "ti-1:xPos2",
+      "ti-2:xPos1",
+      "ti-2:xPos2",
+    ]);
+  });
+
+  it("assigns different stack lanes to labels from different intervals when neither can move aside", () => {
+    const fixed = resolveTimeLineCollisions({
+      timeIntervals: ["ti-1", "ti-2", "ti-3"].map((id) => ({
+        id,
+        xPos1: 400,
+        xPos2: null,
+        xPos1ClockSide: "right",
+        xPos2ClockSide: "right",
+      })),
+      timeZonesClock: { side: "right" },
+      timeLineName: { side: "left" },
+      size: makeSize({ maxHeaderWidth: 100 }),
+      homeDayPassedXPos: 750,
+      clockXTransformPercent: 0,
+    });
+
+    const intervalPoints = fixed.filter(
+      (item) => item.type === "timeInterval",
+    );
+    const collidedPoints = intervalPoints.filter(
+      (item) => item.collisionIndexes.length > 0,
+    );
+
+    expect(collidedPoints).toHaveLength(2);
+    expect(new Set(collidedPoints.map((item) => item.intervalId))).toEqual(
+      new Set(["ti-2", "ti-3"]),
+    );
+    expect(collidedPoints[0].stackSize).toBe(2);
+    expect(collidedPoints[1].stackSize).toBe(2);
+    expect(collidedPoints[0].stackIndex).not.toBe(
+      collidedPoints[1].stackIndex,
+    );
+    fixed.forEach((item) => {
+      item.collisionIndexes.forEach((otherIndex) => {
+        expect(item.stackIndex).not.toBe(fixed[otherIndex].stackIndex);
+      });
+    });
+  });
 });

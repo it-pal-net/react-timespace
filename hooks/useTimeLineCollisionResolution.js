@@ -2,8 +2,40 @@ import { useCallback } from "react";
 
 import { calculateFontSize, calculateTopOffset } from "../core/timeLineMath";
 
-const capitalizeFirstLetter = (string) =>
-  string ? `${string.charAt(0).toUpperCase()}${string.slice(1)}` : "";
+const layoutKeys = [
+  "side",
+  "isCollided",
+  "fontSize",
+  "scale",
+  "zIndex",
+  "top",
+];
+
+const isSameLayout = (first, second) =>
+  layoutKeys.every((key) => Object.is(first?.[key], second?.[key]));
+
+const areIntervalLayoutsEqual = (first = {}, second = {}) => {
+  const firstIds = Object.keys(first);
+  const secondIds = Object.keys(second);
+  if (
+    firstIds.length !== secondIds.length ||
+    firstIds.some(
+      (id) => !Object.prototype.hasOwnProperty.call(second, id),
+    )
+  ) {
+    return false;
+  }
+
+  return firstIds.every((id) =>
+    ["xPos1", "xPos2"].every((pointName) => {
+      const firstLayout = first[id]?.[pointName];
+      const secondLayout = second[id]?.[pointName];
+      return firstLayout == null && secondLayout == null
+        ? true
+        : isSameLayout(firstLayout, secondLayout);
+    }),
+  );
+};
 
 export default function useTimeLineCollisionResolution({
   size,
@@ -14,222 +46,144 @@ export default function useTimeLineCollisionResolution({
   updateTimeInterval,
 }) {
   const applyCollisionResolution = useCallback(
-    (fixedCollisions, dataAcc) => {
-      const headersCollide =
-        fixedCollisions.find((item) => item?.type === "timeLineName")
-          ?.collisionIndexes?.length > 0;
-      const timeZonesClockCollide =
-        (fixedCollisions.find(
-          (item) => !item.isTimeInterval && item?.type !== "timeLineName",
-        )?.collisionIndexes?.length ?? 0) > 0;
-
+    (fixedCollisions, intervalData) => {
       const newColliderState = (initialState) => {
-        const fixedCollisionsMap = fixedCollisions.reduce(
-          (acc, item, index) => {
-            if (item.type === "timeInterval") {
-              acc.timeInterval[item.pointName] = {
-                ...item,
-                index,
-              };
-              return acc;
-            }
-            acc[item.type] = {
-              ...item,
-              index,
-            };
-            return acc;
-          },
-          {
-            timeInterval: {},
-          },
-        );
-        return fixedCollisions.reduce((acc, item, index) => {
-          const collidedItems = (item.collisionIndexes ?? []).length;
-          const isCollided = collidedItems !== 0;
+        const nextState = {
+          ...initialState,
+          timeIntervals: {},
+        };
+        const paddingTop = size.timeLineItemHeaderHeight / 2;
+        const totalAvailableHeight =
+          size.timeLineItemHeaderHeight + paddingTop;
 
-          const paddingTop = size.timeLineItemHeaderHeight / 2;
-          let top = isCollided
-            ? calculateTopOffset(
-                size.timeLineItemHeaderHeight + paddingTop,
-                size.timeLineItemHeaderHeight,
-                collidedItems + 1,
-              )[0]
-            : 0;
-          let fontSize = isCollided
-            ? calculateFontSize(
-                size.timeLineItemHeaderHeight + paddingTop,
-                collidedItems + 1,
-              )
+        fixedCollisions.forEach((item) => {
+          const isCollided = (item.collisionIndexes ?? []).length > 0;
+          const stackSize = Math.max(1, item.stackSize ?? 1);
+          const stackIndex = Math.min(
+            Math.max(0, item.stackIndex ?? 0),
+            stackSize - 1,
+          );
+          const fontSize = isCollided
+            ? calculateFontSize(totalAvailableHeight, stackSize)
             : "1em";
-          let zIndex = zIndexFloors.head;
-          switch (item?.type) {
+          const top = isCollided
+            ? calculateTopOffset(
+                totalAvailableHeight,
+                size.timeLineItemHeaderHeight,
+                stackSize,
+              )[stackIndex]
+            : 0;
+          const layout = {
+            side: item.side,
+            isCollided,
+            fontSize,
+            zIndex: zIndexFloors.head - stackIndex,
+            top,
+          };
+
+          switch (item.type) {
             case "timeLineName":
-              acc.timeLineName = {
-                ...acc.timeLineName,
-                // side: item.side,
-                isCollided,
-                fontSize,
-                // The name is shrunk via `transform: scale` (see `TimeLineRow`) so its
-                // measured width stays natural. Convert the target font size to a scale
-                // relative to the natural header font.
+              nextState.timeLineName = {
+                ...layout,
+                // Keep the measured header width natural so collision decisions
+                // do not oscillate as its visual size changes.
                 scale:
                   isCollided && size.headerFontPx
                     ? (parseFloat(fontSize) || size.headerFontPx) /
                       size.headerFontPx
                     : 1,
-                zIndex,
-                top,
               };
               break;
-            case "timeZonesClock": {
-              const isInterTimePointsCollided =
-                fixedCollisionsMap.timeInterval.xPos1?.collisionIndexes.includes(
-                  fixedCollisionsMap.timeInterval.xPos2?.index,
-                );
-              if (!isInterTimePointsCollided && isCollided) {
-                fontSize = calculateFontSize(
-                  size.timeLineItemHeaderHeight + paddingTop,
-                  2,
-                );
-                top = calculateTopOffset(
-                  size.timeLineItemHeaderHeight + paddingTop,
-                  size.timeLineItemHeaderHeight,
-                  2,
-                )[0];
-                /*
-                zIndex -= 1;
-                */
-              }
-              acc.timeZonesClock = {
-                side: item.side,
-                isCollided,
-                fontSize,
-                zIndex: zIndex + 1,
-                top,
+            case "timeZonesClock":
+              nextState.timeZonesClock = {
+                ...layout,
+                zIndex: zIndexFloors.head + 1 - stackIndex,
               };
               break;
-            }
-            case "timeInterval": {
-              const oppositePointName =
-                item.pointName === "xPos1" ? "xPos2" : "xPos1";
-
-              const isTimeZonesClockCollide =
-                isCollided &&
-                fixedCollisionsMap.timeZonesClock.collisionIndexes.includes(
-                  index,
-                );
-              const isTimeLineNameCollide =
-                isCollided &&
-                fixedCollisionsMap.timeLineName.collisionIndexes.includes(
-                  index,
-                );
-              const isOppositeTimePointCollide =
-                isCollided &&
-                fixedCollisionsMap.timeInterval[
-                  oppositePointName
-                ]?.collisionIndexes.includes(index);
-
-              let topPlace = item.pointName === "xPos1" ? 0 : 1;
-              if (
-                (isTimeZonesClockCollide || isTimeLineNameCollide) &&
-                !isOppositeTimePointCollide
-              ) {
-                topPlace = 1;
-              }
-              if (
-                (isTimeZonesClockCollide || isTimeLineNameCollide) &&
-                isOppositeTimePointCollide
-              ) {
-                topPlace += 1;
-              }
-              zIndex -= topPlace;
-              top = isCollided
-                ? calculateTopOffset(
-                    size.timeLineItemHeaderHeight + paddingTop,
-                    size.timeLineItemHeaderHeight,
-                    collidedItems + 1,
-                  )[topPlace]
-                : 0;
-              acc[`timeInterval${capitalizeFirstLetter(item.pointName)}`] = {
-                side: item.side,
-                isCollided,
-                fontSize,
-                zIndex,
-                top,
-              };
+            case "timeInterval":
+              nextState.timeIntervals[item.intervalId] ??= {};
+              nextState.timeIntervals[item.intervalId][item.pointName] =
+                layout;
               break;
-            }
             default:
               break;
           }
-          return acc;
-        }, initialState);
+        });
+
+        return nextState;
       };
-      setColliderState((s) => {
-        const next = newColliderState(s);
-        // Avoid pointless re-renders during drag: bail out if nothing changed.
+
+      setColliderState((currentState) => {
+        const nextState = newColliderState(currentState);
         if (
-          s.timeZonesClock.side === next.timeZonesClock.side &&
-          s.timeZonesClock.isCollided === next.timeZonesClock.isCollided &&
-          s.timeZonesClock.fontSize === next.timeZonesClock.fontSize &&
-          s.timeZonesClock.zIndex === next.timeZonesClock.zIndex &&
-          s.timeZonesClock.top === next.timeZonesClock.top &&
-          s.timeLineName.side === next.timeLineName.side &&
-          s.timeLineName.isCollided === next.timeLineName.isCollided &&
-          s.timeLineName.fontSize === next.timeLineName.fontSize &&
-          s.timeLineName.scale === next.timeLineName.scale &&
-          s.timeLineName.zIndex === next.timeLineName.zIndex &&
-          s.timeLineName.top === next.timeLineName.top &&
-          s.timeIntervalXPos1.side === next.timeIntervalXPos1.side &&
-          s.timeIntervalXPos1.isCollided ===
-            next.timeIntervalXPos1.isCollided &&
-          s.timeIntervalXPos1.fontSize === next.timeIntervalXPos1.fontSize &&
-          s.timeIntervalXPos1.zIndex === next.timeIntervalXPos1.zIndex &&
-          s.timeIntervalXPos1.top === next.timeIntervalXPos1.top &&
-          s.timeIntervalXPos2.side === next.timeIntervalXPos2.side &&
-          s.timeIntervalXPos2.isCollided ===
-            next.timeIntervalXPos2.isCollided &&
-          s.timeIntervalXPos2.fontSize === next.timeIntervalXPos2.fontSize &&
-          s.timeIntervalXPos2.zIndex === next.timeIntervalXPos2.zIndex &&
-          s.timeIntervalXPos2.top === next.timeIntervalXPos2.top
+          isSameLayout(
+            currentState.timeZonesClock,
+            nextState.timeZonesClock,
+          ) &&
+          isSameLayout(currentState.timeLineName, nextState.timeLineName) &&
+          areIntervalLayoutsEqual(
+            currentState.timeIntervals,
+            nextState.timeIntervals,
+          )
         ) {
-          return s;
+          return currentState;
         }
-        return next;
+        return nextState;
       });
 
-      // If we don't have an interval id (e.g. no interval selected), don't dispatch.
-      if ((dataAcc?.id ?? null) === null) {
+      const intervals = Array.isArray(intervalData)
+        ? intervalData
+        : intervalData
+          ? [intervalData]
+          : [];
+      if (!intervals.length) {
         return;
       }
 
-      let colideIndex = timeZonesClockCollide || headersCollide ? 1 : 0;
-      const collisionPatch = fixedCollisions
+      const collisionItemsByInterval = fixedCollisions
         .filter((item) => item.isTimeInterval)
         .reduce((acc, item) => {
-          const isItemCollided = (item.collisionIndexes ?? []).length > 0;
-          acc[`${item.pointName}ClockSide`] = item.side;
-          acc[`${item.pointName}ClockCollide`] = isItemCollided;
-          acc[`${item.pointName}ClockCollideIndex`] = isItemCollided
-            ? colideIndex
-            : null;
-          if (isItemCollided) {
-            colideIndex += 1;
-          }
+          acc[item.intervalId] ??= {};
+          acc[item.intervalId][item.pointName] = item;
           return acc;
         }, {});
 
-      const nextInterval = { ...dataAcc, ...collisionPatch };
-      const currentInterval = tzState.timeIntervalsMap[dataAcc.id];
-      const changed =
-        currentInterval == null ||
-        Object.keys(nextInterval).some(
-          (k) => !Object.is(nextInterval[k], currentInterval[k]),
-        );
+      intervals.forEach((interval) => {
+        if ((interval?.id ?? null) === null) {
+          return;
+        }
 
-      if (changed) {
-        tzDispatch(updateTimeInterval(nextInterval));
-      }
+        const collisionPatch = {};
+        ["xPos1", "xPos2"].forEach((pointName) => {
+          const item = collisionItemsByInterval[interval.id]?.[pointName];
+          if (!item) {
+            if ((interval[pointName] ?? null) === null) {
+              collisionPatch[`${pointName}ClockCollide`] = false;
+              collisionPatch[`${pointName}ClockCollideIndex`] = null;
+            }
+            return;
+          }
+
+          const isItemCollided = (item.collisionIndexes ?? []).length > 0;
+          collisionPatch[`${pointName}ClockSide`] = item.side;
+          collisionPatch[`${pointName}ClockCollide`] = isItemCollided;
+          collisionPatch[`${pointName}ClockCollideIndex`] = isItemCollided
+            ? item.stackIndex
+            : null;
+        });
+
+        const nextInterval = { ...interval, ...collisionPatch };
+        const currentInterval = tzState.timeIntervalsMap[interval.id];
+        const changed =
+          currentInterval == null ||
+          Object.keys(nextInterval).some(
+            (key) => !Object.is(nextInterval[key], currentInterval[key]),
+          );
+
+        if (changed) {
+          tzDispatch(updateTimeInterval(nextInterval));
+        }
+      });
     },
     [
       size,

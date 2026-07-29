@@ -187,10 +187,14 @@ const TimeLineRow = ({
                   if (timeInterval[posKey] === null) {
                     return null;
                   }
-                  const clockCollider =
-                    posKey === "xPos1"
-                      ? colliderState.timeIntervalXPos1
-                      : colliderState.timeIntervalXPos2;
+                  const clockCollider = colliderState.timeIntervals?.[
+                    timeInterval.id
+                  ]?.[posKey] ?? {
+                    side: timeInterval[`${posKey}ClockSide`] ?? "right",
+                    fontSize: "1em",
+                    top: 0,
+                    zIndex: zIndexFloors.head,
+                  };
                   return (
                     <div
                       key={posKey}
@@ -199,7 +203,7 @@ const TimeLineRow = ({
                         left: timeInterval[posKey] - size.leftListOffset,
                         transition,
                         transform: `translateX(${
-                          timeInterval[`${posKey}ClockSide`] === "left"
+                          clockCollider.side === "left"
                             ? -(100 + clockXTransformPercent)
                             : clockXTransformPercent
                         }%)`,
