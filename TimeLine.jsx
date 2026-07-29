@@ -133,6 +133,7 @@ const TimeLine = ({
   isEmpty,
   hoursElRef,
   timer,
+  availabilityCells,
 }) => {
   const isHomeRow = timeZone === homeZone;
   const hours = useMemo(() => {
@@ -212,15 +213,41 @@ const TimeLine = ({
               isHomeRow && cellMeta[idx]?.isNowCol ? "1" : undefined
             }
             title={
-              !isEmpty && cellMeta[idx]?.isDayStart
-                ? cellMeta[idx]?.weekdayShort
-                : undefined
+              availabilityCells?.[idx]?.overlap?.length
+                ? "Availability overlaps across time zones"
+                : availabilityCells?.[idx]?.available?.length
+                  ? "Available"
+                  : !isEmpty && cellMeta[idx]?.isDayStart
+                    ? cellMeta[idx]?.weekdayShort
+                    : undefined
             }
             style={{
               ...(isEmpty ? { height: 0 } : {}),
               ...(color ? { color } : {}),
             }}
           >
+            {availabilityCells?.[idx]?.available?.map(
+              (segment, segmentIndex) => (
+                <S.AvailabilityLayer
+                  key={`available-${segmentIndex}`}
+                  aria-hidden="true"
+                  style={{
+                    left: `${segment.start * 100}%`,
+                    right: `${(1 - segment.end) * 100}%`,
+                  }}
+                />
+              ),
+            )}
+            {availabilityCells?.[idx]?.overlap?.map((segment, segmentIndex) => (
+              <S.AvailabilityOverlapLayer
+                key={`overlap-${segmentIndex}`}
+                aria-hidden="true"
+                style={{
+                  left: `${segment.start * 100}%`,
+                  right: `${(1 - segment.end) * 100}%`,
+                }}
+              />
+            ))}
             {!isEmpty && <span className="hour-label">{hour}</span>}
           </S.Hour>
         ))}
@@ -244,6 +271,7 @@ TimeLine.propTypes = {
   color: PropTypes.string,
   // Optional clock tick (epoch seconds) used to keep styling in sync over time.
   timer: PropTypes.number,
+  availabilityCells: PropTypes.array,
 };
 
 // Memoized: interval drags dispatch context updates every frame, and the 24

@@ -42,3 +42,8 @@ export {
   SECONDS_IN_DAY,
   MILLISECONDS_IN_DAY,
 } from "./core/timeLineMath";
+export {
+  calculateAvailabilityGrid,
+  normalizeAvailability,
+  isMinuteAvailable,
+} from "./core/availability";

@@ -48,6 +48,7 @@ import {
 } from "./constants";
 import { withThemeDefaults } from "./theme";
 import resolveTheme from "./theming/resolveTheme";
+import { calculateAvailabilityGrid } from "./core/availability";
 
 const defaultColliderState = {
   side: "right",
@@ -92,6 +93,20 @@ const Timespace = ({
     useContext(TimeZonesContext);
   const clockCtx = useTimeZonesClock();
   const timeZonesClock = clockCtx?.timeZonesClock ?? {};
+  const availabilityDate = new Date(
+    (clockCtx?.timer ?? Date.now() / 1000) * 1000,
+  );
+  const availabilityDayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tzState.homeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(availabilityDate);
+  const availabilityGrid = useMemo(
+    () =>
+      calculateAvailabilityGrid(timeLines, tzState.homeZone, availabilityDate),
+    [timeLines, tzState.homeZone, availabilityDayKey],
+  );
 
   const [showTimezoneAbbreviationStored] = useLocalStorage(
     "showTimezoneAbbreviation",
@@ -357,6 +372,7 @@ const Timespace = ({
               handleSetHomeZone={handleSetHomeZone}
               handleAddTimelinePlace={handleAddTimelinePlace}
               handleDeleteTimeline={handleDeleteTimeline}
+              availabilityCells={availabilityGrid[timeLine.id]}
             />
           ))}
         </S.TimeLineList>

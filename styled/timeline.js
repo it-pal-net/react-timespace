@@ -220,6 +220,33 @@ export const Hours = styled.div`
   max-width: 2400px;
 `;
 
+export const AvailabilityLayer = styled.span`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: ${({ theme }) =>
+    theme.mode === "dark"
+      ? "rgba(74, 222, 128, 0.12)"
+      : "rgba(22, 163, 74, 0.1)"};
+`;
+
+export const AvailabilityOverlapLayer = styled.span`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: ${({ theme }) =>
+    theme.mode === "dark"
+      ? "rgba(74, 222, 128, 0.32)"
+      : "rgba(22, 163, 74, 0.25)"};
+  box-shadow: inset 0 2px 0
+    ${({ theme }) =>
+      theme.mode === "dark"
+        ? "rgba(134, 239, 172, 0.75)"
+        : "rgba(21, 128, 61, 0.55)"};
+`;
+
 const getHourBorderColor = ({ theme, period }) => {
   if (theme.mode === "dark") {
     return period === "night"
@@ -303,6 +330,8 @@ export const Hour = styled.div`
   border-radius: ${({ isHomeNowCell }) => (isHomeNowCell ? "4px" : "0")};
 
   .hour-label {
+    position: relative;
+    z-index: 2;
     opacity: ${({ isQuietHour, isPast }) => {
       const base = isQuietHour ? 0.45 : 1;
       return isPast ? base * 0.58 : base;

@@ -37,6 +37,7 @@ const toTimeLine = (timeZone, orderId) => ({
   timeZone,
   color: null,
   allowDelete: true,
+  availability: { start: "08:00", end: "21:00" },
 });
 
 // Reflects the active theme onto the page: data-theme drives the demo.css

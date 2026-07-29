@@ -23,6 +23,8 @@ with one script tag (see [Embedding](#embedding)).
 - **Row reordering** via native HTML5 drag & drop with a ghost preview.
 - **Time-zone deltas** ("+7h" relative to home or local zone), home-zone
   marker, timezone abbreviations, optional seconds.
+- **Availability windows** on each row, with stronger highlighting wherever
+  the declared windows overlap across time zones.
 - **Slots for host-app integration**: render your own items on a line
   (contacts, avatars…), your own place picker, and hook interval scheduling
   into your calendar flow.
@@ -60,6 +62,7 @@ function Zones() {
           orderId: 0,
           name: "New York",
           timeZone: "America/New_York",
+          availability: { start: "08:00", end: "21:00" },
         },
         { id: "berlin", orderId: 1, name: "Berlin", timeZone: "Europe/Berlin" },
         {
@@ -90,6 +93,35 @@ State lives in `TimespaceProvider` (a plain React context + reducer). Your
 app reads and writes it with the exported actions (`setTimelines`,
 `addTimeline`, `updateTimeline`, `deleteTimeline`, `addTimeInterval`, …)
 through `tzDispatch` from `TimeZonesContext`.
+
+### Availability
+
+Add an `availability` window to any timeline. Times are local to that
+timeline's `timeZone` and use `HH:mm` (24-hour) notation:
+
+```jsx
+{
+  id: "berlin",
+  name: "Berlin",
+  timeZone: "Europe/Berlin",
+  availability: { start: "08:00", end: "21:00" }
+}
+```
+
+Multiple windows and overnight windows are supported:
+
+```jsx
+availability: [
+  { start: "08:30", end: "12:00" },
+  { start: "13:00", end: "17:30" },
+  { start: "22:00", end: "02:00" },
+];
+```
+
+Each row's available time is shaded green. When two or more rows declare
+availability, the instants shared by every declared window receive a stronger
+highlight. Timelines without an `availability` value do not participate in the
+overlap calculation.
 
 ## Key props
 
@@ -160,11 +192,11 @@ import ThemeConfig from "react-timespace/theme-config";
 
 `ThemeConfig` props:
 
-| Prop                             | Purpose                                                                                                       |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `excludedThemeNames`             | Hide presets from the picker                                                                                   |
-| `showTimespaceRenderingControls` | Hide the Time Zones tab (sizing/marker controls)                                                              |
-| `colorLabels`                    | Labels for extra color keys your themes carry (unknown keys render with their raw name)                       |
+| Prop                             | Purpose                                                                                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `excludedThemeNames`             | Hide presets from the picker                                                                                                                  |
+| `showTimespaceRenderingControls` | Hide the Time Zones tab (sizing/marker controls)                                                                                              |
+| `colorLabels`                    | Labels for extra color keys your themes carry (unknown keys render with their raw name)                                                       |
 | `components`                     | Host slots: `{ Select, Input, GradientPicker, ImagePicker }` — gradient/image background fills appear only when the matching slot is provided |
 
 The configurator styles itself with `--tsc-*` design tokens that read your

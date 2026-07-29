@@ -61,6 +61,7 @@ const TimeLineRow = ({
   renderLineItems,
   getLineHighlight,
   renderPlaceSelector,
+  availabilityCells,
 }) => {
   const theme = useTheme();
   const { tzState, tzDispatch, timeIntervals } = useContext(TimeZonesContext);
@@ -425,6 +426,7 @@ const TimeLineRow = ({
         homeZone={tzState.homeZone}
         hourMaxWidth={HOUR_MAX_WIDTH}
         timer={clockCtx?.timer}
+        availabilityCells={availabilityCells}
       />
       {/* Crisp within-row segments of the interval hands. The full-height
           marker line (rendered at the Timespace level) sits at basement
@@ -487,6 +489,7 @@ TimeLineRow.propTypes = {
   renderLineItems: PropTypes.func,
   getLineHighlight: PropTypes.func,
   renderPlaceSelector: PropTypes.func,
+  availabilityCells: PropTypes.array,
 };
 
 export default TimeLineRow;

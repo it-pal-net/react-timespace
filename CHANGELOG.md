@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add per-timeline local availability windows and highlight common
+  cross-time-zone availability.
+
 ## 0.2.1
 
 Time-interval drag rework — reliability, hit targets, and performance.
