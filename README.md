@@ -322,11 +322,7 @@ collision resolver, and the drag machinery — are documented in
 [ARCHITECTURE.md](./ARCHITECTURE.md). The pure math lives in `core/` and is
 unit-tested (`npm test`).
 
-## Status & roadmap
-
-Early extraction (0.x): the API may still move. Planned:
-
-- keyboard a11y for interval endpoints
+---
 
 Issues and PRs welcome.
 
