@@ -275,11 +275,9 @@ unit-tested (`npm test`).
 
 Early extraction (0.x): the API may still move. Planned:
 
-- packaged demo site + embeddable widget
-- pre-built ESM/CJS dist + TypeScript types
-- multiple simultaneous intervals
+- TypeScript types (the package is `prop-types`-checked today, no `.d.ts`)
 - keyboard a11y for interval endpoints
-- targeted `ResizeObserver` instead of body-level mutation observation
+- collision-resolved labels for every interval, not just the first
 
 Issues and PRs welcome.
 
