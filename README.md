@@ -195,7 +195,7 @@ import ThemeConfig from "react-timespace/theme-config";
 | Prop                             | Purpose                                                                                                                                       |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `excludedThemeNames`             | Hide presets from the picker                                                                                                                  |
-| `showTimespaceRenderingControls` | Hide the Time Zones tab (sizing/marker controls)                                                                                              |
+| `showTimespaceRenderingControls` | Hide the Time Zones appearance tab (sizing, marker and color controls)                                                                        |
 | `colorLabels`                    | Labels for extra color keys your themes carry (unknown keys render with their raw name)                                                       |
 | `components`                     | Host slots: `{ Select, Input, GradientPicker, ImagePicker }` — gradient/image background fills appear only when the matching slot is provided |
 

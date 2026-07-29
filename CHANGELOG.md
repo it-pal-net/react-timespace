@@ -4,6 +4,8 @@
 
 - Add per-timeline local availability windows and highlight common
   cross-time-zone availability.
+- Keep view preferences out of the theme configurator so hosts can present
+  them in a dedicated settings surface.
 
 ## 0.2.1
 

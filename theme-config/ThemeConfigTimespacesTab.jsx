@@ -3,28 +3,15 @@ import PropTypes from "prop-types";
 import SliderValueInput from "./SliderValueInput";
 import ThemeConfigColorRows from "./ThemeConfigColorRows";
 import ThemeConfigSectionCard from "./ThemeConfigSectionCard";
-import ThemeConfigTimespaceDisplay from "./ThemeConfigTimespaceDisplay";
 
 import * as S from "./styled";
 
 const getSliderFillPercent = (value, min, max) =>
   Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
 
-function ThemeConfigTimespacesTab({
-  state,
-  actions,
-  showGroupTimelinesControl = false,
-  prefs,
-  onPrefsChange,
-}) {
+function ThemeConfigTimespacesTab({ state, actions }) {
   return (
     <>
-      <ThemeConfigTimespaceDisplay
-        showGroupTimelinesControl={showGroupTimelinesControl}
-        prefs={prefs}
-        onPrefsChange={onPrefsChange}
-      />
-
       <ThemeConfigSectionCard
         title="Timeline"
         onReset={actions.onResetTimespaceTimeline}
@@ -135,9 +122,6 @@ function ThemeConfigTimespacesTab({
 ThemeConfigTimespacesTab.propTypes = {
   state: PropTypes.object.isRequired,
   actions: PropTypes.object.isRequired,
-  showGroupTimelinesControl: PropTypes.bool,
-  prefs: PropTypes.object,
-  onPrefsChange: PropTypes.func,
 };
 
 export default ThemeConfigTimespacesTab;

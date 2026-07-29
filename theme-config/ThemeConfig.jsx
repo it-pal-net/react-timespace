@@ -16,11 +16,8 @@ import * as S from "./styled";
 function ThemeConfig({
   excludedThemeNames = [],
   showTimespaceRenderingControls = true,
-  showGroupTimelinesControl = false,
   showTabs = true,
   excludedColorKeys = [],
-  prefs,
-  onPrefsChange,
   components = {},
   colorLabels = {},
 }) {
@@ -128,9 +125,6 @@ function ThemeConfig({
     <ThemeConfigTimespacesTab
       state={timespacesTabState}
       actions={timespacesTabActions}
-      showGroupTimelinesControl={showGroupTimelinesControl}
-      prefs={prefs}
-      onPrefsChange={onPrefsChange}
     />
   ) : null;
   const backgroundTabBody = (
@@ -219,9 +213,6 @@ function ThemeConfig({
 ThemeConfig.propTypes = {
   excludedThemeNames: PropTypes.arrayOf(PropTypes.string),
   showTimespaceRenderingControls: PropTypes.bool,
-  // When true, the Time Zones tab also offers the host-consumed
-  // "Group timelines by" control (writes the `groupTimelinesBy` pref).
-  showGroupTimelinesControl: PropTypes.bool,
   // When false, drop the App/Time Zones/Background tab bar and stack every
   // section as one flat, labelled scroll — for standalone widget surfaces
   // where the whole panel is just "theme this widget".
@@ -229,10 +220,6 @@ ThemeConfig.propTypes = {
   // Color keys to hide from the App/Time Zones color rows — for host-specific
   // colors baked into the presets that don't apply to this surface.
   excludedColorKeys: PropTypes.arrayOf(PropTypes.string),
-  // Controlled prefs: pass both to drive the Time Zones view prefs from host
-  // state (e.g. URL) instead of localStorage.
-  prefs: PropTypes.object,
-  onPrefsChange: PropTypes.func,
   // Optional host-app component slots: { Select, Input, GradientPicker,
   // ImagePicker }. Background gradient/image fills are only offered when the
   // matching slot is provided.
