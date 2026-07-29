@@ -58,6 +58,9 @@ webpack, Next.js, Rspack, Parcel). Every component is client-side, so the
 build carries a `"use client"` banner for React Server Component setups.
 `require()` works from Node 22.12 on.
 
+TypeScript declarations ship with the package — no `@types/…` install (see
+[TypeScript](#typescript)).
+
 ## Quick start
 
 ```jsx
@@ -146,7 +149,7 @@ overlap calculation.
 | `renderPlaceSelector({ timeLine, height, onSelect, onBlur })` | slot                            | Replace the built-in time-zone select with your own place search                              |
 | `handleAddTimelinePlace(timeLine, option)`                    | callback                        | Persist a picked place; omit to let the built-in select update state directly                 |
 | `handleDeleteTimeline(timeLine)`                              | callback                        | Row delete button handler                                                                     |
-| `onSetTimelinesOrder(timeLines)`                              | callback                        | Persist row order after drag & drop                                                           |
+| `onSetTimelinesOrder()`                                       | callback                        | Fires after a reorder drag settles — read the new order from `timeLines` on the context       |
 | `onAddCalendarEvent(timeInterval)`                            | callback                        | Show the calendar button on intervals and handle scheduling                                   |
 | `formatDuration(seconds)`                                     | fn → string                     | Override the `"1h 30m"` duration formatting (i18n)                                            |
 | `showTimezoneAbbreviation` / `showSeconds`                    | bool                            | Display options (default to localStorage-backed settings)                                     |
@@ -217,6 +220,46 @@ The configurator styles itself with `--tsc-*` design tokens that read your
 app's CSS variables first (`--text`, `--background-brand-bold`, …) and fall
 back to sensible mode-aware defaults, so it drops into any app.
 
+## TypeScript
+
+Declarations ship in the package, for both entry points:
+
+```ts
+import { Timespace, setTimelines } from "react-timespace";
+import type { TimeLine, TimeInterval, TimespaceProps } from "react-timespace";
+import ThemeConfig from "react-timespace/theme-config";
+```
+
+They resolve under `bundler`, `node16` and `nodenext` module resolution.
+
+The runtime is JavaScript with `prop-types`, so the `.d.ts` files are
+hand-written rather than generated. `npm run typecheck` compiles them against
+`types/smoke.tsx`, which imports every public export the way a consumer would —
+so a signature that drifts from the implementation fails the build before
+publish.
+
+Exported types cover the resources (`TimeLine`, `TimeInterval`,
+`Availability`), the component and slot signatures (`TimespaceProps`,
+`PlaceSelectorArgs`, `LineHighlight`, `TimeZoneOption`), state
+(`TimeZonesState`, `TimeZonesContextValue`, `TimeZonesClockContextValue`,
+`TimeZoneClock`), theming (`TimespaceTheme`, `ThemePreset`, `ThemeMode`) and
+availability (`AvailabilityCell`, `AvailabilitySegment`).
+
+`TimeLine` and `TimeInterval` carry an index signature: the reducer stores
+resources verbatim, so host apps can hang their own fields off a row without
+casting.
+
+Emotion's `Theme` is deliberately left alone — augment it in your own app if
+you want `useTheme()` to know about the Timespace keys:
+
+```ts
+import type { TimespaceTheme } from "react-timespace";
+
+declare module "@emotion/react" {
+  export interface Theme extends TimespaceTheme {}
+}
+```
+
 ## Embedding
 
 Don't use React? Drop the hosted widget into any page. There's a sandbox at
@@ -253,9 +296,15 @@ says.
 ```sh
 npm install        # package deps + build/test tooling
 npm test           # pure-core unit tests
+npm run typecheck  # compile the hand-written .d.ts against types/smoke.tsx
 npm run build      # bundle the package into dist/ (what npm publishes)
 cd demo && npm install && npm run dev   # local playground on vite
 ```
+
+`npm run build` also copies `index.d.ts` and `theme-config/index.d.ts` into
+`dist/` under the flat names the bundle uses. The other `.d.ts` files in the
+tree type the source-only subpaths (`./theming`, `./tzOptions`, `./state/*`)
+for linked checkouts; they aren't part of the tarball.
 
 The demo resolves `react-timespace` to the sources next to it, not to
 `dist/`, so there is no build step between an edit and the playground.
@@ -275,7 +324,6 @@ unit-tested (`npm test`).
 
 Early extraction (0.x): the API may still move. Planned:
 
-- TypeScript types (the package is `prop-types`-checked today, no `.d.ts`)
 - keyboard a11y for interval endpoints
 - collision-resolved labels for every interval, not just the first
 

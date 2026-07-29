@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### TypeScript types
+
+- **Declarations ship with the package.** `react-timespace` and
+  `react-timespace/theme-config` both resolve types with no `@types/…`
+  install, under `bundler`, `node16` and `nodenext` module resolution. The
+  `exports` map gained `types` conditions and the manifest a top-level
+  `types` field, in both the committed (source) and `publishConfig` (dist)
+  variants.
+- The runtime stays JavaScript with `prop-types`, so the `.d.ts` files are
+  hand-written. `npm run typecheck` compiles them against `types/smoke.tsx`,
+  which imports every public export the way a consumer would; it runs as part
+  of `prepublishOnly`, so a signature that drifts from the implementation
+  fails before publish.
+- Exported types cover the resources (`TimeLine`, `TimeInterval`,
+  `Availability`), the component and its slots (`TimespaceProps`,
+  `PlaceSelectorArgs`, `LineHighlight`, `TimeZoneOption`), state
+  (`TimeZonesState`, `TimeZonesContextValue`, `TimeZonesClockContextValue`),
+  theming (`TimespaceTheme`, `ThemePreset`, `ThemeMode`) and availability
+  (`AvailabilityCell`, `AvailabilitySegment`).
+- `TimeLine` and `TimeInterval` carry an index signature so host apps can hang
+  their own fields off a resource without casting — the reducer stores them
+  verbatim either way.
+- Emotion's `Theme` is left un-augmented; the README shows the one-liner for
+  apps that want `useTheme()` to know the Timespace keys.
+- The source-only subpaths (`./theming`, `./tzOptions`, `./state/*`) get
+  declarations too, so linked checkouts and monorepos type-resolve as well.
+  They stay out of the tarball, which still exposes `.` and `./theme-config`.
+
+### Docs
+
+- The roadmap listed several items that had already shipped — the packaged
+  demo site and embed widget, the pre-built `dist/`, multiple simultaneous
+  intervals, and the targeted `ResizeObserver`. Dropped, along with the CJS
+  build the package deliberately does not do.
+- `onSetTimelinesOrder` is documented with its real signature: it takes no
+  arguments, and the new order is read from `timeLines` on the context.
+
 ## 0.3.0
 
 Availability windows, plus a split between view settings and theming.

@@ -1,0 +1,24 @@
+{
+  "//": "Type-checking only — the package itself is JavaScript. `npm run typecheck` compiles the hand-authored declarations together with types/smoke.tsx, which imports every public export the way a consumer would. skipLibCheck stays off: these declarations are the thing under test.",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "skipLibCheck": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "react-timespace": ["./index.d.ts"],
+      "react-timespace/theme-config": ["./theme-config/index.d.ts"],
+      "react-timespace/theming": ["./theming/index.d.ts"],
+      "react-timespace/tzOptions": ["./tzOptions.d.ts"],
+      "react-timespace/state/*": ["./state/*"]
+    }
+  },
+  "include": ["index.d.ts", "tzOptions.d.ts", "theme-config", "theming", "state", "types"],
+  "exclude": ["node_modules", "dist", "demo", "**/*.js", "**/*.jsx"]
+}
