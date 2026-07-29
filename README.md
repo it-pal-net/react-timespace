@@ -7,6 +7,8 @@ A multi-timezone timeline for React. Render the day as horizontal timelines —
 one per time zone — and drag a shared **time interval** across them to plan
 meetings, hand-offs, or focus blocks that work for everyone.
 
+![Four time-zone rows — Makassar, New York, Bangkok and London — each with an hour strip, a live clock and a delta from the home zone. Green shading marks each row's availability, brighter where every row overlaps, and a glowing "now" line runs down through all four.](https://raw.githubusercontent.com/it-pal-net/react-timespace/main/demo/demo.png)
+
 Extracted from (and battle-tested in) [SyncContact](https://synccontact.com),
 where it powers the Time Zones view.
 
