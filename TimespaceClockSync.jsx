@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 
 import { useTimeZonesClock } from "./state/timeZonesProvider";
-import { MILLISECONDS_IN_DAY } from "./core/timeLineMath";
+import { getNowHandWindowFraction } from "./core/timeLineMath";
 
 /**
  * Small component that subscribes to the ticking clock context and updates
@@ -10,14 +10,16 @@ import { MILLISECONDS_IN_DAY } from "./core/timeLineMath";
  *
  * The "now" position is relative to the viewed 24h window (`viewStartUtcMs`),
  * so a scrolled window keeps the hand glued to the correct hour column; when
- * "now" is outside the window the position goes out of range and the
- * consumers hide themselves.
+ * "now" is outside the window the hand becomes a ghost — the current wall
+ * time projected onto the viewed day (see `getNowHandWindowFraction`).
  */
 export default function TimespaceClockSync({
   targetElRef,
   size,
   homeDayPassedXPosRef,
   viewStartUtcMs,
+  todayStartUtcMs,
+  viewOffsetSeconds,
   positionKey,
   onMinuteTick,
   onPositionReady,
@@ -36,9 +38,13 @@ export default function TimespaceClockSync({
       return;
     if (timer == null || viewStartUtcMs == null) return;
 
-    const windowDayFraction =
-      (timer * 1000 - viewStartUtcMs) / MILLISECONDS_IN_DAY;
-    const passedPixels = size.hoursLineWidth * windowDayFraction;
+    const { fraction } = getNowHandWindowFraction({
+      nowUtcMs: timer * 1000,
+      viewStartUtcMs,
+      todayStartUtcMs: todayStartUtcMs ?? viewStartUtcMs,
+      viewOffsetSeconds: viewOffsetSeconds ?? 0,
+    });
+    const passedPixels = size.hoursLineWidth * fraction;
     // Two coordinate spaces are used:
     // - CSS var: relative to the timeline/list container
     // - collision math: viewport coordinates (used with drag/drop x positions)
@@ -66,6 +72,8 @@ export default function TimespaceClockSync({
   }, [
     timer,
     viewStartUtcMs,
+    todayStartUtcMs,
+    viewOffsetSeconds,
     size?.hoursLineWidth,
     size?.leftOffset,
     size?.leftListOffset,
@@ -92,6 +100,10 @@ TimespaceClockSync.propTypes = {
   homeDayPassedXPosRef: PropTypes.object.isRequired,
   // UTC ms of the viewed window's first column.
   viewStartUtcMs: PropTypes.number,
+  // UTC ms of the start of today in the home zone (ghost wall-time anchor).
+  todayStartUtcMs: PropTypes.number,
+  // Seconds into its home-zone day at the viewed window's left edge.
+  viewOffsetSeconds: PropTypes.number,
   // Used to invalidate the "position ready" cache when the reference frame changes
   // without a size change (e.g. switching home zone).
   positionKey: PropTypes.string,

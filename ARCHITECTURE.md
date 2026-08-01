@@ -139,11 +139,12 @@ row's zone), so any window — including one spanning two days or a DST
 transition — renders its true local hours.
 
 The "now" line and per-row clocks are positioned relative to the window start
-(`TimespaceClockSync`), so they slide with the cells and appear whenever the
-current time is inside the window. When it is outside, the now-clock's
-collision box is parked far off-screen — on whichever side of the name-side
-threshold it left through — so labels don't dodge a phantom and the row-name
-block doesn't flip sides while scrolling away.
+(`TimespaceClockSync`), so they slide with the cells. When the current time
+is inside the window they render live; when it is outside they become a
+dimmed **ghost** — the current home-zone wall time projected onto the viewed
+day (`getNowHandWindowFraction`), aligned with the hour labels and wrapped so
+the hand always sits somewhere on the strip. Live or ghost, the hand's clock
+participates in collision resolution, so row names keep dodging it.
 
 Interval times-of-day map onto the window through
 `getXPosFromDayOffset(…, viewOffsetSeconds)`: a time earlier than the

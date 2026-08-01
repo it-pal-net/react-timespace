@@ -53,6 +53,23 @@ const timelineNowLineStyles = css`
       opacity: 0.06;
     }
   }
+
+  /* Ghost hand: "now" is outside the viewed window, so the hand marks the
+     current wall time projected onto the viewed day — dimmed, no glow. Last
+     (and double-classed) so it wins over the live and reduced-motion rules;
+     the glow animation animates opacity, so it must be off for the dim to
+     hold. */
+  &.timeline-now-line.timeline-now-line-ghost {
+    animation: none;
+    opacity: 0.3;
+    filter: saturate(0.4);
+    box-shadow: 0 0 0 1px rgba(120, 200, 255, 0.1);
+  }
+
+  &.timeline-now-line.timeline-now-line-ghost::after {
+    animation: none;
+    opacity: 0;
+  }
 `;
 
 export const TimePoint = styled.div`

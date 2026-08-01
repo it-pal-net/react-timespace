@@ -176,6 +176,32 @@ export function getAdjacentDayStartOffsetHours(
   return (targetMs - todayStartMs) / MILLISECONDS_IN_HOUR;
 }
 
+/**
+ * Where the current-time hand sits within the viewed 24h window, as a 0..1
+ * fraction. When "now" is inside the window this is its true instant
+ * position; otherwise the hand becomes a ghost: the current home-zone wall
+ * time projected onto the viewed day (aligned with the hour labels), wrapped
+ * so it always lands inside the window.
+ */
+export function getNowHandWindowFraction({
+  nowUtcMs,
+  viewStartUtcMs,
+  todayStartUtcMs,
+  viewOffsetSeconds,
+}) {
+  const dayFraction = (nowUtcMs - viewStartUtcMs) / MILLISECONDS_IN_DAY;
+  if (dayFraction >= 0 && dayFraction < 1) {
+    return { fraction: dayFraction, isGhost: false };
+  }
+
+  const nowSecondsOfDay = (nowUtcMs - todayStartUtcMs) / 1000;
+  const ghostSeconds =
+    (((nowSecondsOfDay - viewOffsetSeconds) % SECONDS_IN_DAY) +
+      SECONDS_IN_DAY) %
+    SECONDS_IN_DAY;
+  return { fraction: ghostSeconds / SECONDS_IN_DAY, isGhost: true };
+}
+
 // "+3h", "-5h", "+1d", "-1d 4h" — compact label for a view offset in hours.
 export function formatHourOffsetLabel(offsetHours) {
   if (!offsetHours) {

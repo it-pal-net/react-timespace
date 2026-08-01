@@ -50,6 +50,7 @@ const TimeLineRow = ({
   viewStartUtcMs,
   isPanning,
   showNowMarker,
+  nowMarkerGhost,
   showTimezoneAbbreviation,
   minimal,
   deltaBase,
@@ -72,10 +73,12 @@ const TimeLineRow = ({
 
   const paddingTop = size.timeLineItemHeaderHeight / 2;
 
-  // "Now" UI shows whenever the current time falls inside the scrolled
-  // window (its position tracks the window); hosts that render rows
-  // standalone keep the old measurement-only gating.
+  // "Now" UI always shows once measured: live when the current time falls
+  // inside the scrolled window, dimmed ghost (current wall time projected
+  // onto the viewed day) otherwise. Hosts that render rows standalone keep
+  // the old measurement-only gating.
   const showNowUi = showNowMarker ?? isNowXPosReady;
+  const nowClockOpacity = showNowUi ? (nowMarkerGhost ? 0.5 : 1) : 0;
   // Interval hands/clocks are anchored to the committed scroll position, so
   // they fade out while the strip is being panned by hours.
   const panFadeStyle = {
@@ -168,12 +171,17 @@ const TimeLineRow = ({
             }}
           >
             <div
+              title={
+                nowMarkerGhost
+                  ? "Current time — the viewed day is different"
+                  : undefined
+              }
               style={{
                 position: "absolute",
                 whiteSpace: "nowrap",
                 left: "var(--homeDayPassedXPos)",
                 transition,
-                opacity: showNowUi ? 1 : 0,
+                opacity: nowClockOpacity,
                 pointerEvents: showNowUi ? undefined : "none",
                 transform: [
                   "translateX(",
@@ -481,7 +489,11 @@ const TimeLineRow = ({
           animates opacity itself, so an inline opacity: 0 would lose. */}
       {showNowUi && (
         <S.TimePointBody
-          className="timeline-now-line timeline-now-line-segment"
+          className={
+            nowMarkerGhost
+              ? "timeline-now-line timeline-now-line-segment timeline-now-line-ghost"
+              : "timeline-now-line timeline-now-line-segment"
+          }
           style={{
             position: "absolute",
             height: "100%",
@@ -506,6 +518,7 @@ TimeLineRow.propTypes = {
   viewStartUtcMs: PropTypes.number,
   isPanning: PropTypes.bool,
   showNowMarker: PropTypes.bool,
+  nowMarkerGhost: PropTypes.bool,
   showTimezoneAbbreviation: PropTypes.bool,
   minimal: PropTypes.bool,
   deltaBase: PropTypes.oneOf(["local", "home"]),

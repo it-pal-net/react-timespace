@@ -9,6 +9,7 @@ import {
   formatHourOffsetLabel,
   getAdjacentDayStartOffsetHours,
   getBoundaryPositions,
+  getNowHandWindowFraction,
   getSecondsFromStartOfDay,
   getStartOfZonedDayUtcMs,
   getTimeZoneOffsetSecondsSafe,
@@ -191,6 +192,47 @@ describe("core/timeLineMath", () => {
       expect(getStartOfZonedDayUtcMs("Asia/Tokyo", date)).toBe(
         Date.parse("2026-07-15T15:00:00Z"),
       );
+    });
+  });
+
+  describe("getNowHandWindowFraction", () => {
+    const HOUR_MS = 3600 * 1000;
+    const todayStartUtcMs = Date.parse("2026-07-15T00:00:00Z");
+    const nowUtcMs = todayStartUtcMs + 6 * HOUR_MS; // 06:00
+
+    it("is the live instant position while now is inside the window", () => {
+      const { fraction, isGhost } = getNowHandWindowFraction({
+        nowUtcMs,
+        viewStartUtcMs: todayStartUtcMs + 2 * HOUR_MS,
+        todayStartUtcMs,
+        viewOffsetSeconds: 2 * 3600,
+      });
+      expect(isGhost).toBe(false);
+      expect(fraction).toBeCloseTo(4 / 24, 9);
+    });
+
+    it("projects the wall time onto the viewed day when now is outside", () => {
+      // Window = tomorrow 02:00 .. day-after 02:00; 06:00 sits 4h in.
+      const { fraction, isGhost } = getNowHandWindowFraction({
+        nowUtcMs,
+        viewStartUtcMs: todayStartUtcMs + 26 * HOUR_MS,
+        todayStartUtcMs,
+        viewOffsetSeconds: 2 * 3600,
+      });
+      expect(isGhost).toBe(true);
+      expect(fraction).toBeCloseTo(4 / 24, 9);
+    });
+
+    it("wraps a wall time earlier than the window start to the next day", () => {
+      // Window = tomorrow 08:00 ..; 06:00 appears 22h in (the following 06:00).
+      const { fraction, isGhost } = getNowHandWindowFraction({
+        nowUtcMs,
+        viewStartUtcMs: todayStartUtcMs + 32 * HOUR_MS,
+        todayStartUtcMs,
+        viewOffsetSeconds: 8 * 3600,
+      });
+      expect(isGhost).toBe(true);
+      expect(fraction).toBeCloseTo(22 / 24, 9);
     });
   });
 

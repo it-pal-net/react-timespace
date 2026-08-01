@@ -271,9 +271,27 @@ const Timespace = ({
   const nowMs = nowDate.getTime();
   const isNowInView =
     nowMs >= viewStartUtcMs && nowMs < viewStartUtcMs + MILLISECONDS_IN_DAY;
-  const showNowMarker = isNowXPosReady && isNowInView;
+  // Once measured, the hand always renders: live on the window that contains
+  // "now", as a dimmed ghost (current wall time projected onto the viewed
+  // day) everywhere else.
+  const showNowMarker = isNowXPosReady;
+  const isNowGhost = !isNowInView;
   const effectiveOffsetHours =
     (viewStartUtcMs - todayStartUtcMs) / MILLISECONDS_IN_HOUR;
+
+  // Like viewOffsetSeconds, but for the effective (mid-pan) window — the
+  // ghost hand anchors to it so it stays aligned with the hour labels while
+  // dragging.
+  const effectiveViewOffsetSeconds = useMemo(() => {
+    if (viewStartUtcMs === todayStartUtcMs) {
+      return 0;
+    }
+    const viewedDayStartUtcMs = getStartOfZonedDayUtcMs(
+      tzState.homeZone,
+      new Date(viewStartUtcMs),
+    );
+    return (viewStartUtcMs - viewedDayStartUtcMs) / 1000;
+  }, [tzState.homeZone, viewStartUtcMs, todayStartUtcMs]);
 
   // The now clock/line slides with the window while panning (CSS var), but
   // its side/stacking and the row-name side come from the collision pass —
@@ -294,20 +312,9 @@ const Timespace = ({
     }).format(new Date(viewStartUtcMs));
   }, [viewStartUtcMs, tzState.homeZone]);
 
-  // When "now" is outside the viewed window its clock is hidden — park the
-  // collision box far off-screen so labels stop dodging a phantom, but keep
-  // it on the same side of the name-side threshold so scrolling away never
-  // flips the row-name block.
-  const getEffectiveNowXPos = () => {
-    if (isNowInView) {
-      return homeDayPassedXPosRef.current;
-    }
-    const nameSideThreshold =
-      (size.maxHeaderWidth ?? 0) +
-      (size.leftOffset ?? 0) +
-      (size.leftListOffset ?? 0);
-    return homeDayPassedXPosRef.current > nameSideThreshold ? 1e6 : -1e6;
-  };
+  // Live or ghost, the hand is always somewhere on the strip (TimespaceClockSync
+  // wraps the position into the window), so labels dodge its clock as usual.
+  const getEffectiveNowXPos = () => homeDayPassedXPosRef.current;
 
   const calculatePositionFromDayOffset = useCallback(
     (secondsOffsetFromDay) =>
@@ -330,7 +337,7 @@ const Timespace = ({
         homeDayPassedXPos: getEffectiveNowXPos(),
         clockXTransformPercent,
       }),
-    [size, isNowInView],
+    [size],
   );
 
   const { applyCollisionResolution } = useTimeLineCollisionResolution({
@@ -432,6 +439,8 @@ const Timespace = ({
           size={size}
           homeDayPassedXPosRef={homeDayPassedXPosRef}
           viewStartUtcMs={viewStartUtcMs}
+          todayStartUtcMs={todayStartUtcMs}
+          viewOffsetSeconds={effectiveViewOffsetSeconds}
           positionKey={tzState.homeZone}
           onMinuteTick={() => {
             setColliderTrigger((c) => c + 1);
@@ -467,6 +476,7 @@ const Timespace = ({
               viewStartUtcMs={viewStartUtcMs}
               isPanning={isPanning}
               showNowMarker={showNowMarker}
+              nowMarkerGhost={isNowGhost}
               renderLineItems={renderLineItems}
               getLineHighlight={getLineHighlight}
               renderPlaceSelector={renderPlaceSelector}
@@ -573,9 +583,9 @@ const Timespace = ({
         {/* Gate on isNowXPosReady: until TimespaceClockSync has measured the list
           and set --homeDayPassedXPos, `left` collapses to 0 and the hand would
           paint alone in the top-left corner before the timeline renders.
-          showNowMarker additionally drops the hand whenever "now" is outside
-          the scrolled window; while it is inside, the hand slides with the
-          cells (the CSS var is derived from the same viewStartUtcMs). */}
+          The hand slides with the cells (the CSS var derives from the same
+          viewStartUtcMs); when "now" is outside the scrolled window it turns
+          into a dimmed ghost marking the current wall time on the viewed day. */}
         {showNowMarker && (
           <S.TimePoint
             style={{
@@ -586,7 +596,11 @@ const Timespace = ({
               <VerticalMarker
                 size={size}
                 left="var(--homeDayPassedXPos)"
-                className="timeline-now-line"
+                className={
+                  isNowGhost
+                    ? "timeline-now-line timeline-now-line-ghost"
+                    : "timeline-now-line"
+                }
               />
             </div>
           </S.TimePoint>

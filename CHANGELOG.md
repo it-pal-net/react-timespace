@@ -15,8 +15,12 @@ Free horizontal scrolling — the day snapping from 0.5.0 is gone.
   exported `formatHourOffsetLabel`.
 - **The "now" line and per-row clocks stay visible on any scrolled window that
   contains the current time** — their position is derived from the window
-  start, so they slide with the cells during a pan and hide only when "now"
-  leaves the window.
+  start, so they slide with the cells during a pan.
+- **A ghost "now" hand on other days**: when the current time is outside the
+  viewed window, the hand doesn't disappear — it renders dimmed and glow-less
+  at the current wall time projected onto the viewed day, clocks included
+  (with a "viewed day is different" tooltip), and still participates in label
+  collision resolution.
 - **Intervals map onto the scrolled window.** A time-of-day earlier than the
   window's left edge wraps to the next calendar day, so every interval keeps
   exactly one position on the strip; durations are now derived from the
