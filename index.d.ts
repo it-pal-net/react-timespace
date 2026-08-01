@@ -216,6 +216,13 @@ export interface TimeZonesState {
   localeZoneOffsetMinutes: number;
   /** Default drag snapping step. `Ctrl/Cmd` overrides to 1s, `Shift` to 5min. */
   intervalStepSeconds: number;
+  /**
+   * Which home-zone day the timeline shows: `0` today, `-1` yesterday, `1`
+   * tomorrow, … Horizontal drag-panning over the hour strips commits whole
+   * days here; set it via `setState({ viewDayOffset })` to page
+   * programmatically.
+   */
+  viewDayOffset: number;
   timeLinesIds: string[];
   timeLinesMap: Record<string, TimeLine>;
   timeIntervalsIds: string[];
@@ -411,6 +418,7 @@ export declare const fontPresets: Array<{
 
 export declare const SECONDS_IN_DAY: 86400;
 export declare const MILLISECONDS_IN_DAY: 86400000;
+export declare const MILLISECONDS_IN_HOUR: 3600000;
 
 /** `5400` → `"1h 30m"`. Empty string for `0` or a falsy input. */
 export declare function formatDurationShort(seconds: number): string;
@@ -425,6 +433,23 @@ export declare function getTimeZoneOffsetSecondsSafe(
   timeZone: TimeZoneId | null | undefined,
   date?: Date,
 ): number | null;
+
+/** UTC ms of 00:00 of `date`'s calendar day in `timeZone`. */
+export declare function getStartOfZonedDayUtcMs(
+  timeZone: TimeZoneId,
+  date?: Date,
+): number;
+
+/**
+ * UTC ms of 00:00 of the day `dayOffset` days away from `date`'s day in
+ * `timeZone` (DST-safe). Combine with `tzState.viewDayOffset` to resolve the
+ * day page the timeline is showing.
+ */
+export declare function getViewDayStartUtcMs(
+  timeZone: TimeZoneId,
+  date: Date,
+  dayOffset?: number,
+): number;
 
 // ---------------------------------------------------------------------------
 // Availability

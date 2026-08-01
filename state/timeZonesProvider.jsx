@@ -170,6 +170,8 @@ const initialState = {
   localZone: getLocalTimeZone(),
   localeZoneOffsetMinutes: 0,
   intervalStepSeconds: defaultIntervalStep,
+  // Which home-zone day the timeline shows: 0 = today, -1 = yesterday, …
+  viewDayOffset: 0,
 
   timeLinesIds: [],
   timeLinesMap: {},

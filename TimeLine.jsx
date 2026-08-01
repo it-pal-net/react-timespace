@@ -2,77 +2,11 @@ import { memo, useMemo } from "react";
 import PropTypes from "prop-types";
 
 import * as S from "./styled";
-
-function getTimeZoneOffsetSecondsSafe(timeZone, date) {
-  if (!timeZone) return null;
-  const d = date ?? new Date();
-
-  const tryGet = (timeZoneNameStyle) => {
-    const formatterOffset = new Intl.DateTimeFormat("en-US", {
-      hourCycle: "h23",
-      timeZoneName: timeZoneNameStyle,
-      timeZone,
-    });
-    const part = formatterOffset
-      .formatToParts(d)
-      .find((p) => p.type === "timeZoneName");
-    const value = part?.value ?? "";
-    if (value === "GMT" || value === "UTC") return 0;
-
-    // Examples: "GMT+07:00", "UTC-05:00"
-    const match = value.match(/(?:GMT|UTC)([+-]\d{2}):(\d{2})/);
-    if (!match) return null;
-    const offsetHours = parseInt(match[1], 10);
-    const offsetMinutes = parseInt(match[2], 10);
-    return offsetHours * 3600 + offsetMinutes * 60;
-  };
-
-  try {
-    // Prefer longOffset when supported (more consistent).
-    return tryGet("longOffset");
-  } catch (e) {
-    // Some environments don't support longOffset; try shortOffset.
-    try {
-      return tryGet("shortOffset");
-    } catch (e2) {
-      return null;
-    }
-  }
-}
-
-function getZonedYMD(timeZone, date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const map = {};
-  for (const p of parts) {
-    if (p.type !== "literal") map[p.type] = p.value;
-  }
-
-  const year = Number(map.year);
-  const month = Number(map.month);
-  const day = Number(map.day);
-
-  return { year, month, day };
-}
-
-function getStartOfZonedDayUtcMs(timeZone, date = new Date()) {
-  const { year, month, day } = getZonedYMD(timeZone, date);
-  const baseUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
-
-  // Two-pass correction helps around DST boundaries.
-  let guess = new Date(baseUtcMs);
-  for (let i = 0; i < 2; i += 1) {
-    const offsetSeconds = getTimeZoneOffsetSecondsSafe(timeZone, guess) ?? 0;
-    guess = new Date(baseUtcMs - offsetSeconds * 1000);
-  }
-
-  return guess.getTime();
-}
+import {
+  getZonedYMD,
+  getStartOfZonedDayUtcMs,
+  MILLISECONDS_IN_HOUR,
+} from "./core/timeLineMath";
 
 function isWeekendByWeekdayShort(weekdayShort) {
   return weekdayShort === "Sat" || weekdayShort === "Sun";
@@ -88,43 +22,6 @@ function getHourPeriod(hour) {
   return "evening";
 }
 
-function getHoursLine({ timeZone, homeZone }) {
-  const hoursInDay = 24;
-  const hoursArray = Array.from({ length: hoursInDay }, (_, i) => i);
-
-  // Get the current date and time in the home timezone
-  const options = { timeZone: homeZone, hour: "numeric", hour12: false };
-  const homeTimeRaw = new Intl.DateTimeFormat("en-US", options).format(
-    new Date(),
-  );
-
-  let homeTime = parseInt(homeTimeRaw, 10);
-  homeTime = (homeTime + hoursInDay) % hoursInDay;
-
-  // Calculate the time difference between the homezone and the target timezone
-  const targetTime = new Date().toLocaleString("en-US", { timeZone });
-  const targetHour = new Date(targetTime).getHours();
-  let timeDifference = targetHour - homeTime;
-
-  // Adjust for date line crossing
-  if (timeDifference < -12) {
-    timeDifference += 24;
-  } else if (timeDifference > 12) {
-    timeDifference -= 24;
-  }
-
-  // Generate the array of hours in the target timezone using map
-  const resultHours = hoursArray.map((hour) => {
-    const hourInTargetZone = Number(
-      ((hour + timeDifference) % 24).toFixed(0),
-      10,
-    );
-    return hourInTargetZone < 0 ? hourInTargetZone + 24 : hourInTargetZone;
-  });
-
-  return resultHours;
-}
-
 const TimeLine = ({
   timeZone,
   homeZone,
@@ -134,11 +31,10 @@ const TimeLine = ({
   hoursElRef,
   timer,
   availabilityCells,
+  viewStartUtcMs,
+  isPanning,
 }) => {
   const isHomeRow = timeZone === homeZone;
-  const hours = useMemo(() => {
-    return getHoursLine({ timeZone, homeZone });
-  }, [timeZone, homeZone]);
 
   const nowMs = (timer ?? null) != null ? timer * 1000 : Date.now();
   const nowDate = useMemo(() => new Date(nowMs), [nowMs]);
@@ -149,39 +45,53 @@ const TimeLine = ({
     return `${year}-${month}-${day}`;
   }, [homeZone, nowDate]);
 
-  const homeStartUtcMs = useMemo(() => {
+  const homeTodayStartUtcMs = useMemo(() => {
     return getStartOfZonedDayUtcMs(homeZone, nowDate);
   }, [homeZone, homeDayKey, nowDate]);
 
+  // Timespace passes the viewed window's start (day paging / drag panning);
+  // standalone rows without it fall back to "today in the home zone".
+  const windowStartUtcMs = viewStartUtcMs ?? homeTodayStartUtcMs;
+
   const cellMeta = useMemo(() => {
-    // Each column corresponds to a specific home-zone hour boundary within "today"
-    // (home zone). We can translate that instant into the row's timezone to derive
-    // weekday/weekend + "day start" markers (00:00 in that timezone).
-    const weekdayFmt = new Intl.DateTimeFormat("en-US", {
+    // Each column corresponds to one home-zone hour boundary of the viewed
+    // window. Formatting that exact instant in the row's timezone yields the
+    // hour label, weekday/weekend and "day start" markers (00:00 in that
+    // timezone) — correct even across DST transitions inside the window.
+    const cellFmt = new Intl.DateTimeFormat("en-US", {
       weekday: "short",
+      hour: "numeric",
+      hourCycle: "h23",
       timeZone,
     });
 
-    const homeNowIndexRaw = Math.floor(
-      (nowMs - homeStartUtcMs) / (60 * 60 * 1000),
-    );
-    const homeNowIndex = Math.max(0, Math.min(23, homeNowIndexRaw));
-
-    return hours.map((hour, idx) => {
-      const boundaryInstant = new Date(homeStartUtcMs + idx * 60 * 60 * 1000);
-      const weekdayShort = weekdayFmt.format(boundaryInstant);
+    return Array.from({ length: 24 }, (_, idx) => {
+      const boundaryInstant = new Date(
+        windowStartUtcMs + idx * MILLISECONDS_IN_HOUR,
+      );
+      let hour = 0;
+      let weekdayShort = "";
+      for (const part of cellFmt.formatToParts(boundaryInstant)) {
+        if (part.type === "hour") hour = Number(part.value);
+        else if (part.type === "weekday") weekdayShort = part.value;
+      }
 
       return {
+        hour,
         isWeekend: isWeekendByWeekdayShort(weekdayShort),
         weekdayShort,
         isDayStart: hour === 0,
-        // Past/now/future should be *global* across rows (anchored to home-zone "now" column),
-        // so the semantic split aligns with the vertical "now" line.
-        isPast: idx < homeNowIndex,
-        isNowCol: idx === homeNowIndex,
       };
     });
-  }, [hours, homeStartUtcMs, timeZone, nowMs]);
+  }, [windowStartUtcMs, timeZone]);
+
+  // Past/now/future are *global* across rows (anchored to the home-zone "now"
+  // column) so the semantic split aligns with the vertical "now" line. Outside
+  // the viewed window the index goes below 0 (future day: nothing past) or
+  // above 23 (past day: everything past).
+  const homeNowIndex = Math.floor(
+    (nowMs - windowStartUtcMs) / MILLISECONDS_IN_HOUR,
+  );
 
   return (
     <S.TimeLine
@@ -197,60 +107,74 @@ const TimeLine = ({
           ...(isEmpty ? { height: 0 } : {}),
         }}
       >
-        {hours.map((hour, idx) => (
-          <S.Hour
-            key={`${idx}-${hour}`}
-            isEmpty={isEmpty}
-            maxWidth={hourMaxWidth}
-            period={getHourPeriod(hour)}
-            isQuietHour={hour < 7 || hour > 22}
-            isWeekend={cellMeta[idx]?.isWeekend}
-            isDayStart={cellMeta[idx]?.isDayStart}
-            isPast={cellMeta[idx]?.isPast}
-            isNowCol={cellMeta[idx]?.isNowCol}
-            isHomeNowCell={isHomeRow && cellMeta[idx]?.isNowCol}
-            data-timeline-home-now-hour={
-              isHomeRow && cellMeta[idx]?.isNowCol ? "1" : undefined
-            }
-            title={
-              availabilityCells?.[idx]?.overlap?.length
-                ? "Availability overlaps across time zones"
-                : availabilityCells?.[idx]?.available?.length
-                  ? "Available"
-                  : !isEmpty && cellMeta[idx]?.isDayStart
-                    ? cellMeta[idx]?.weekdayShort
-                    : undefined
-            }
-            style={{
-              ...(isEmpty ? { height: 0 } : {}),
-              ...(color ? { color } : {}),
-            }}
-          >
-            {availabilityCells?.[idx]?.available?.map(
-              (segment, segmentIndex) => (
-                <S.AvailabilityLayer
-                  key={`available-${segmentIndex}`}
-                  aria-hidden="true"
-                  style={{
-                    left: `${segment.start * 100}%`,
-                    right: `${(1 - segment.end) * 100}%`,
-                  }}
-                />
-              ),
-            )}
-            {availabilityCells?.[idx]?.overlap?.map((segment, segmentIndex) => (
-              <S.AvailabilityOverlapLayer
-                key={`overlap-${segmentIndex}`}
-                aria-hidden="true"
-                style={{
-                  left: `${segment.start * 100}%`,
-                  right: `${(1 - segment.end) * 100}%`,
-                }}
-              />
-            ))}
-            {!isEmpty && <span className="hour-label">{hour}</span>}
-          </S.Hour>
-        ))}
+        {cellMeta.map(({ hour, isWeekend, weekdayShort, isDayStart }, idx) => {
+          const isNowCol = idx === homeNowIndex;
+          const availabilityOpacityStyle = {
+            // Availability bands are computed for the committed day page; while
+            // the strip is being panned by hours they would sit on the wrong
+            // columns, so fade them out for the duration of the gesture.
+            opacity: isPanning ? 0 : 1,
+            transition: "opacity 160ms ease",
+          };
+          return (
+            <S.Hour
+              key={`${idx}-${hour}`}
+              isEmpty={isEmpty}
+              maxWidth={hourMaxWidth}
+              period={getHourPeriod(hour)}
+              isQuietHour={hour < 7 || hour > 22}
+              isWeekend={isWeekend}
+              isDayStart={isDayStart}
+              isPast={idx < homeNowIndex}
+              isNowCol={isNowCol}
+              isHomeNowCell={isHomeRow && isNowCol}
+              data-timeline-home-now-hour={
+                isHomeRow && isNowCol ? "1" : undefined
+              }
+              title={
+                availabilityCells?.[idx]?.overlap?.length
+                  ? "Availability overlaps across time zones"
+                  : availabilityCells?.[idx]?.available?.length
+                    ? "Available"
+                    : !isEmpty && isDayStart
+                      ? weekdayShort
+                      : undefined
+              }
+              style={{
+                ...(isEmpty ? { height: 0 } : {}),
+                ...(color ? { color } : {}),
+              }}
+            >
+              {availabilityCells?.[idx]?.available?.map(
+                (segment, segmentIndex) => (
+                  <S.AvailabilityLayer
+                    key={`available-${segmentIndex}`}
+                    aria-hidden="true"
+                    style={{
+                      left: `${segment.start * 100}%`,
+                      right: `${(1 - segment.end) * 100}%`,
+                      ...availabilityOpacityStyle,
+                    }}
+                  />
+                ),
+              )}
+              {availabilityCells?.[idx]?.overlap?.map(
+                (segment, segmentIndex) => (
+                  <S.AvailabilityOverlapLayer
+                    key={`overlap-${segmentIndex}`}
+                    aria-hidden="true"
+                    style={{
+                      left: `${segment.start * 100}%`,
+                      right: `${(1 - segment.end) * 100}%`,
+                      ...availabilityOpacityStyle,
+                    }}
+                  />
+                ),
+              )}
+              {!isEmpty && <span className="hour-label">{hour}</span>}
+            </S.Hour>
+          );
+        })}
       </S.Hours>
     </S.TimeLine>
   );
@@ -272,6 +196,10 @@ TimeLine.propTypes = {
   // Optional clock tick (epoch seconds) used to keep styling in sync over time.
   timer: PropTypes.number,
   availabilityCells: PropTypes.array,
+  // UTC ms of the viewed window's first column (defaults to today's start in
+  // the home zone). Day paging / drag panning shift it in whole hours.
+  viewStartUtcMs: PropTypes.number,
+  isPanning: PropTypes.bool,
 };
 
 // Memoized: interval drags dispatch context updates every frame, and the 24

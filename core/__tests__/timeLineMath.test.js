@@ -7,10 +7,14 @@ import {
   calculateTopOffset,
   formatDeltaToLocal,
   getBoundaryPositions,
+  getPanCommitDayDelta,
   getSecondsFromStartOfDay,
+  getStartOfZonedDayUtcMs,
   getTimeZoneOffsetSecondsSafe,
+  getViewDayStartUtcMs,
   getXPosFromDayOffset,
   MILLISECONDS_IN_DAY,
+  PAN_COMMIT_REMAINDER_HOURS,
   SECONDS_IN_DAY,
 } from "../timeLineMath";
 
@@ -162,6 +166,81 @@ describe("core/timeLineMath", () => {
       expect(getXPosFromDayOffset(SECONDS_IN_DAY / 2, size)).toBe(
         size.hoursLineWidth / 2 + size.leftOffset + size.leftListOffset,
       );
+    });
+  });
+
+  describe("getStartOfZonedDayUtcMs", () => {
+    it("finds midnight of the zone's calendar day", () => {
+      // 2026-07-15T22:30Z is already July 16 in Tokyo (UTC+9).
+      const date = new Date("2026-07-15T22:30:00Z");
+      expect(getStartOfZonedDayUtcMs("Etc/UTC", date)).toBe(
+        Date.parse("2026-07-15T00:00:00Z"),
+      );
+      expect(getStartOfZonedDayUtcMs("Asia/Tokyo", date)).toBe(
+        Date.parse("2026-07-15T15:00:00Z"),
+      );
+    });
+  });
+
+  describe("getViewDayStartUtcMs", () => {
+    const baseDate = new Date("2026-07-15T10:00:00Z");
+
+    it("returns the same day's start for offset 0", () => {
+      expect(getViewDayStartUtcMs("Etc/UTC", baseDate, 0)).toBe(
+        Date.parse("2026-07-15T00:00:00Z"),
+      );
+    });
+
+    it("shifts by whole days in both directions", () => {
+      expect(getViewDayStartUtcMs("Etc/UTC", baseDate, 1)).toBe(
+        Date.parse("2026-07-16T00:00:00Z"),
+      );
+      expect(getViewDayStartUtcMs("Etc/UTC", baseDate, -3)).toBe(
+        Date.parse("2026-07-12T00:00:00Z"),
+      );
+    });
+
+    it("stays day-aligned across a 23-hour DST day", () => {
+      // Berlin springs forward on 2026-03-29: that day is 23 hours long.
+      const beforeTransition = new Date("2026-03-28T12:00:00Z");
+      // 2026-03-28 starts at 23:00Z (CET, +1); 2026-03-30 at 22:00Z (CEST, +2).
+      expect(getViewDayStartUtcMs("Europe/Berlin", beforeTransition, 0)).toBe(
+        Date.parse("2026-03-27T23:00:00Z"),
+      );
+      expect(getViewDayStartUtcMs("Europe/Berlin", beforeTransition, 2)).toBe(
+        Date.parse("2026-03-29T22:00:00Z"),
+      );
+    });
+  });
+
+  describe("getPanCommitDayDelta", () => {
+    it("springs back below the remainder threshold", () => {
+      expect(getPanCommitDayDelta(0)).toBe(0);
+      expect(getPanCommitDayDelta(PAN_COMMIT_REMAINDER_HOURS - 1)).toBe(0);
+      expect(getPanCommitDayDelta(-(PAN_COMMIT_REMAINDER_HOURS - 1))).toBe(0);
+    });
+
+    it("pages one day past the threshold", () => {
+      expect(getPanCommitDayDelta(PAN_COMMIT_REMAINDER_HOURS)).toBe(1);
+      expect(getPanCommitDayDelta(-PAN_COMMIT_REMAINDER_HOURS)).toBe(-1);
+      expect(getPanCommitDayDelta(23)).toBe(1);
+    });
+
+    it("keeps every full day-width dragged", () => {
+      expect(getPanCommitDayDelta(24)).toBe(1);
+      expect(getPanCommitDayDelta(50)).toBe(2);
+      expect(getPanCommitDayDelta(55)).toBe(3);
+      expect(getPanCommitDayDelta(-55)).toBe(-3);
+    });
+
+    it("lets a flick page without the distance", () => {
+      expect(getPanCommitDayDelta(2, 1)).toBe(1);
+      expect(getPanCommitDayDelta(-2, -1)).toBe(-1);
+      expect(getPanCommitDayDelta(26, 1)).toBe(2);
+    });
+
+    it("ignores the flick once the threshold decided", () => {
+      expect(getPanCommitDayDelta(23, -1)).toBe(1);
     });
   });
 

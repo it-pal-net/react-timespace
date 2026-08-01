@@ -23,6 +23,7 @@ import DurationArrow from "./DurationArrow";
 import * as S from "./styled";
 import useTimeLineMeasurements from "./hooks/useTimeLineMeasurements";
 import useTimelineReorderDnD from "./hooks/useTimelineReorderDnD";
+import useTimelineDayPan from "./hooks/useTimelineDayPan";
 import useTimeIntervalDrag, {
   getResizeTargetPosKey,
 } from "./hooks/useTimeIntervalDrag";
@@ -35,8 +36,11 @@ import {
   calculateDurationData,
   formatDeltaToLocal,
   getTimeZoneOffsetSecondsSafe,
+  getViewDayStartUtcMs,
   getXPosFromDayOffset,
   getSecondsFromStartOfDay,
+  MILLISECONDS_IN_DAY,
+  MILLISECONDS_IN_HOUR,
   SECONDS_IN_DAY,
 } from "./core/timeLineMath";
 import {
@@ -94,19 +98,33 @@ const Timespace = ({
     useContext(TimeZonesContext);
   const clockCtx = useTimeZonesClock();
   const timeZonesClock = clockCtx?.timeZonesClock ?? {};
-  const availabilityDate = new Date(
-    (clockCtx?.timer ?? Date.now() / 1000) * 1000,
-  );
-  const availabilityDayKey = new Intl.DateTimeFormat("en-CA", {
+  const nowDate = new Date((clockCtx?.timer ?? Date.now() / 1000) * 1000);
+  // A stable day-level key so day-boundary math only recomputes at midnight.
+  const homeDayKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: tzState.homeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(availabilityDate);
+  }).format(nowDate);
+
+  // Committed day page shown by the timeline (0 = today in the home zone).
+  // Drag-panning shifts the rendered window by hours on top of this and
+  // commits whole days on release.
+  const viewDayOffset = tzState.viewDayOffset ?? 0;
+  const isViewingToday = viewDayOffset === 0;
+  const pageStartUtcMs = useMemo(
+    () => getViewDayStartUtcMs(tzState.homeZone, nowDate, viewDayOffset),
+    [tzState.homeZone, homeDayKey, viewDayOffset],
+  );
+
   const availabilityGrid = useMemo(
     () =>
-      calculateAvailabilityGrid(timeLines, tzState.homeZone, availabilityDate),
-    [timeLines, tzState.homeZone, availabilityDayKey],
+      calculateAvailabilityGrid(
+        timeLines,
+        tzState.homeZone,
+        new Date(pageStartUtcMs + MILLISECONDS_IN_DAY / 2),
+      ),
+    [timeLines, tzState.homeZone, pageStartUtcMs],
   );
 
   const [showTimezoneAbbreviationStored] = useLocalStorage(
@@ -207,6 +225,19 @@ const Timespace = ({
   });
 
   const homeDayPassedXPosRef = useRef(0);
+  // On other day pages the "now" clock is hidden — park its collision box far
+  // off-screen so labels stop dodging a phantom, but keep it on the same side
+  // of the name-side threshold so paging never flips the row-name block.
+  const getEffectiveNowXPos = () => {
+    if (isViewingToday) {
+      return homeDayPassedXPosRef.current;
+    }
+    const nameSideThreshold =
+      (size.maxHeaderWidth ?? 0) +
+      (size.leftOffset ?? 0) +
+      (size.leftListOffset ?? 0);
+    return homeDayPassedXPosRef.current > nameSideThreshold ? 1e6 : -1e6;
+  };
 
   const calculatePositionFromDayOffset = useCallback(
     (secondsOffsetFromDay) => getXPosFromDayOffset(secondsOffsetFromDay, size),
@@ -225,10 +256,10 @@ const Timespace = ({
         timeZonesClock,
         timeLineName,
         size,
-        homeDayPassedXPos: homeDayPassedXPosRef.current,
+        homeDayPassedXPos: getEffectiveNowXPos(),
         clockXTransformPercent,
       }),
-    [size],
+    [size, isViewingToday],
   );
 
   const { applyCollisionResolution } = useTimeLineCollisionResolution({
@@ -241,7 +272,7 @@ const Timespace = ({
   });
 
   useTimeLineAutoCollision({
-    homeDayPassedXPos: homeDayPassedXPosRef.current,
+    homeDayPassedXPos: getEffectiveNowXPos(),
     size,
     timeIntervals,
     colliderState,
@@ -257,6 +288,38 @@ const Timespace = ({
   const requestCollisionResolution = useCallback(() => {
     setColliderTrigger((current) => current + 1);
   }, []);
+
+  const handleCommitDayOffset = useCallback(
+    (nextOffset) => {
+      tzDispatch(setState({ viewDayOffset: nextOffset }));
+      // The now clock (dis)appears with the page change; re-run label layout.
+      requestCollisionResolution();
+    },
+    [requestCollisionResolution],
+  );
+
+  const { panHours, isPanning, handlePanPointerDown } = useTimelineDayPan({
+    size,
+    viewDayOffset,
+    onCommitDayOffset: handleCommitDayOffset,
+  });
+
+  // First column of the rendered 24h window. Day-aligned when settled;
+  // shifted by whole hours while a drag-pan is in flight.
+  const viewStartUtcMs = pageStartUtcMs + panHours * MILLISECONDS_IN_HOUR;
+  const showNowMarker = isNowXPosReady && isViewingToday && !isPanning;
+
+  const viewDayLabel = useMemo(() => {
+    if (isViewingToday) {
+      return null;
+    }
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: tzState.homeZone,
+    }).format(new Date(pageStartUtcMs + MILLISECONDS_IN_DAY / 2));
+  }, [isViewingToday, pageStartUtcMs, tzState.homeZone]);
 
   const { handlePointerMove, handlePointerUp, handleDragStartTimePoint } =
     useTimeIntervalDrag({
@@ -353,6 +416,7 @@ const Timespace = ({
           ref={listElRef}
           onDragOver={handleDragOverTimeLineList}
           onDrop={handleDropTimeLine}
+          onPointerDown={handlePanPointerDown}
         >
           {timeLines.map((timeLine, index) => (
             <TimeLineRow
@@ -364,6 +428,9 @@ const Timespace = ({
               size={size}
               colliderState={colliderState}
               isNowXPosReady={isNowXPosReady}
+              viewStartUtcMs={viewStartUtcMs}
+              isPanning={isPanning}
+              showNowMarker={showNowMarker}
               renderLineItems={renderLineItems}
               getLineHighlight={getLineHighlight}
               renderPlaceSelector={renderPlaceSelector}
@@ -404,6 +471,7 @@ const Timespace = ({
                   timeInterval={timeInterval}
                   posKey={posKey}
                   size={size}
+                  faded={isPanning}
                   onAddCalendarEvent={
                     onAddCalendarEvent
                       ? () => onAddCalendarEvent(timeInterval)
@@ -440,6 +508,7 @@ const Timespace = ({
                     color={theme.color.intervalHandBody}
                     durationText={timeInterval.durationHuman}
                     headerHeight={size.timeLineItemHeaderHeight}
+                    faded={isPanning}
                     handleDragStart={(ev) => {
                       handleDragStartTimePoint(
                         ev,
@@ -456,8 +525,10 @@ const Timespace = ({
         {/* clock hand of current time in a home zone  */}
         {/* Gate on isNowXPosReady: until TimespaceClockSync has measured the list
           and set --homeDayPassedXPos, `left` collapses to 0 and the hand would
-          paint alone in the top-left corner before the timeline renders. */}
-        {isNowXPosReady && (
+          paint alone in the top-left corner before the timeline renders.
+          showNowMarker additionally drops the hand while another day page is
+          shown or the window is mid-pan — "now" is off-window then. */}
+        {showNowMarker && (
           <S.TimePoint
             style={{
               fontSize: `${theme.uiScale * 150}%`,
@@ -471,6 +542,37 @@ const Timespace = ({
               />
             </div>
           </S.TimePoint>
+        )}
+
+        {!isViewingToday && (
+          <S.DayNav data-timespace-day-nav>
+            <S.DayNavButton
+              type="button"
+              aria-label="Previous day"
+              onClick={() => handleCommitDayOffset(viewDayOffset - 1)}
+            >
+              ‹
+            </S.DayNavButton>
+            <S.DayNavLabel data-timespace-day-label>
+              {viewDayLabel}
+              <span className="day-nav-offset">
+                {viewDayOffset > 0 ? `+${viewDayOffset}d` : `${viewDayOffset}d`}
+              </span>
+            </S.DayNavLabel>
+            <S.DayNavButton
+              type="button"
+              aria-label="Next day"
+              onClick={() => handleCommitDayOffset(viewDayOffset + 1)}
+            >
+              ›
+            </S.DayNavButton>
+            <S.DayNavButton
+              type="button"
+              onClick={() => handleCommitDayOffset(0)}
+            >
+              Today
+            </S.DayNavButton>
+          </S.DayNav>
         )}
 
         <div

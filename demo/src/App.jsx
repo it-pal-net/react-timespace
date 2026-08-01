@@ -161,8 +161,8 @@ function DemoTimespace() {
           + Add interval
         </button>
         <span style={hintStyle}>
-          Drag interval edges to resize · drag the arrow to move · drag rows to
-          reorder
+          Drag the hours sideways to change day · drag interval edges to
+          resize · drag the arrow to move · drag rows to reorder
         </span>
       </div>
       <div style={timespaceAreaStyle}>

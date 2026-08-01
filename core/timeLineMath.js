@@ -1,4 +1,5 @@
 export const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
+export const MILLISECONDS_IN_HOUR = 60 * 60 * 1000;
 export const SECONDS_IN_DAY = 24 * 60 * 60;
 
 export function addPercentShift(percent, number) {
@@ -101,6 +102,81 @@ export function getTimeZoneOffsetSecondsSafe(timeZone, date) {
       return null;
     }
   }
+}
+
+export function getZonedYMD(timeZone, date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const map = {};
+  for (const p of parts) {
+    if (p.type !== "literal") map[p.type] = p.value;
+  }
+
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+  };
+}
+
+export function getStartOfZonedDayUtcMs(timeZone, date = new Date()) {
+  const { year, month, day } = getZonedYMD(timeZone, date);
+  const baseUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+
+  // Two-pass correction helps around DST boundaries.
+  let guess = new Date(baseUtcMs);
+  for (let i = 0; i < 2; i += 1) {
+    const offsetSeconds = getTimeZoneOffsetSecondsSafe(timeZone, guess) ?? 0;
+    guess = new Date(baseUtcMs - offsetSeconds * 1000);
+  }
+
+  return guess.getTime();
+}
+
+/**
+ * Start of the day `dayOffset` days away from `date`'s day in `timeZone`.
+ * Aiming at the middle of the target day before snapping to its start keeps
+ * the result correct across 23/25-hour DST days.
+ */
+export function getViewDayStartUtcMs(timeZone, date, dayOffset = 0) {
+  const todayStartMs = getStartOfZonedDayUtcMs(timeZone, date);
+  if (!dayOffset) {
+    return todayStartMs;
+  }
+  return getStartOfZonedDayUtcMs(
+    timeZone,
+    new Date(
+      todayStartMs + dayOffset * MILLISECONDS_IN_DAY + MILLISECONDS_IN_DAY / 2,
+    ),
+  );
+}
+
+// Releasing a day pan with less than this many hours of remainder (and no
+// flick) springs back instead of paging to the neighbour day.
+export const PAN_COMMIT_REMAINDER_HOURS = 6;
+
+/**
+ * How many whole days a released drag-pan commits: every full day-width
+ * dragged, plus one more day when the remainder passes the threshold or the
+ * release was a flick. Positive = toward later days.
+ */
+export function getPanCommitDayDelta(draggedHours, flickDayDirection = 0) {
+  const fullDays = Math.trunc(draggedHours / 24);
+  const remainderHours = draggedHours - fullDays * 24;
+
+  let extraDays = 0;
+  if (Math.abs(remainderHours) >= PAN_COMMIT_REMAINDER_HOURS) {
+    extraDays = Math.sign(remainderHours);
+  } else if (flickDayDirection) {
+    extraDays = flickDayDirection;
+  }
+
+  return fullDays + extraDays;
 }
 
 export function getXPosFromDayOffset(secondsOffsetFromDay, size) {

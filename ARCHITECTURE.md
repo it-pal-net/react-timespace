@@ -14,6 +14,8 @@ interactive "time interval" handles you can drag to select a range.
   - resize interval endpoints (pointerdown on a 16px grab strip centered on
     each hand, then window-level pointermove/pointerup)
   - move the whole interval range (drag the duration arrow — line or text)
+  - pan the day window (pointerdown on the hour strip, hour-stepped live
+    preview, whole-day commit on release)
 - **Measurement & geometry**:
   - measure list/header/hour widths and offsets
   - convert between pixels and "seconds from start of day"
@@ -115,11 +117,45 @@ persist `*DayOffsetSeconds`.
   - owns timeline reorder drag & drop + ghost overlay (appended into
     `portalContainer`, falling back to `#content` then `document.body`)
 
+- **`hooks/useTimelineDayPan.js`**
+  - owns horizontal drag-panning of the day window (same window-listener
+    pattern as interval drags; Escape cancels)
+  - while dragging, `panHours` shifts the rendered window in whole hours; the
+    release commits whole days into `tzState.viewDayOffset` via
+    `getPanCommitDayDelta` (full day-widths + threshold/flick remainder)
+
 - **`state/timeZonesProvider.jsx`**
   - the provider: resource reducer (timeLines/timeIntervals), a
     boundary-aligned ticker, per-zone `Intl.DateTimeFormat` clocks and offsets
 
+## Day paging (`viewDayOffset`)
+
+The timeline always renders a 24h window. `tzState.viewDayOffset` (0 = today
+in the home zone) picks which day-aligned page it is; committed pages are
+DST-correct day boundaries (`getViewDayStartUtcMs`). During an active pan the
+window start is additionally shifted by whole hours (`panHours`), so hour
+labels, weekday/day-start markers and past/now shading are all derived
+per-cell from the actual boundary instants (`TimeLine` formats each column's
+instant in the row's zone).
+
+While panning, everything anchored to the committed page fades out (interval
+hands/clocks, duration arrow, availability bands); the "now" line/clocks are
+only shown on today's page. On other pages the now-clock's collision box is
+parked off-screen — on whichever side of the name-side threshold today's
+clock is — so labels don't dodge a phantom and the row-name block never flips
+sides when paging. A floating pill (top center) shows the viewed date with
+‹ › / Today controls whenever `viewDayOffset !== 0`.
+
 ## Interaction rules (UX)
+
+### Day panning
+
+- drag anywhere on an hour strip (cursor: `grab`); headers, clocks, interval
+  grab strips and the row drag handle keep their own gestures
+- release commits `trunc(draggedHours / 24)` days, plus one more when the
+  remainder is ≥ 6h — or on a flick (≥ 0.4 px/ms over the last 120ms)
+- a short slow drag springs back; Escape cancels; on touch, `touch-action:
+  pan-y` keeps vertical list scrolling native
 
 ### Interval snapping
 

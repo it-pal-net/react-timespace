@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.5.0
+
+Horizontal drag-to-pan across days.
+
+### Day paging
+
+- **Drag the hour strip sideways to move between days.** The 24h window
+  slides live in whole hours while dragging; the release commits whole
+  home-zone days into the new `tzState.viewDayOffset` (0 = today). Every full
+  day-width dragged counts, plus one more day when the remainder passes 6
+  hours — or on a quick flick. Short slow drags spring back; Escape cancels.
+  On touch, `touch-action: pan-y` keeps vertical scrolling native.
+- **Day pages are DST-correct**: committed pages start at the actual 00:00 of
+  the target calendar day in the home zone (23/25-hour days included), via
+  the new `getViewDayStartUtcMs` helper.
+- **A floating date pill** (top center) appears on any page other than today:
+  `‹ Sat, Aug 8 +7d › Today`, with previous/next/Today controls. Hosts can
+  also page programmatically with `setState({ viewDayOffset })`.
+- **Hour cells are now derived per-instant.** Labels, weekday/weekend tint,
+  day-start markers and past/now shading come from formatting each column's
+  actual boundary instant in the row's zone, so half-hour zones and DST
+  transition days render their true local hours on every page.
+- **"Now" UI stays on today**: the glowing now line and the per-row now
+  clocks hide on other day pages (and while panning); their collision box is
+  parked off-screen so labels stop dodging a phantom, without flipping the
+  row-name side.
+- **Anchored overlays fade during a pan** — interval hands, endpoint clocks,
+  the duration arrow and availability bands — and return once the page
+  settles. Availability is computed for the viewed day, so weekday-dependent
+  windows are right on every page.
+- New exports: `getViewDayStartUtcMs`, `getStartOfZonedDayUtcMs`,
+  `MILLISECONDS_IN_HOUR`; `TimeZonesState` gained `viewDayOffset`.
+
+### Fixes
+
+- Removed the vestigial `-webkit-user-drag: element` on timeline rows: it
+  made the whole row a native HTML5 drag source (reorder starts from the
+  drag handle's `draggable` attribute), and the native drag cancelled the
+  pointer stream of any horizontal gesture on the hour strip.
+
 ## 0.4.0
 
 TypeScript declarations in the package, collective clock-label collision, and a

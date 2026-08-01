@@ -36,6 +36,7 @@ const DurationArrow = ({
   rightBoundary,
   durationText,
   headerHeight,
+  faded,
   handleDragStart,
 }) => {
   const theme = useTheme();
@@ -111,6 +112,9 @@ const DurationArrow = ({
       style={{
         top: yPos > maxYPos ? maxYPos : yPos,
         left: startX,
+        opacity: faded ? 0 : 1,
+        transition: "opacity 0.18s ease",
+        pointerEvents: faded ? "none" : undefined,
       }}
       width={svgWidth}
       height={svgHeight}
@@ -193,6 +197,7 @@ DurationArrow.propTypes = {
   rightBoundary: PropTypes.number,
   durationText: PropTypes.string,
   headerHeight: PropTypes.number,
+  faded: PropTypes.bool,
   handleDragStart: PropTypes.func,
 };
 

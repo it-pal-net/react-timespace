@@ -39,8 +39,11 @@ import Default, {
   formatDurationShort,
   formatDeltaToLocal,
   getTimeZoneOffsetSecondsSafe,
+  getStartOfZonedDayUtcMs,
+  getViewDayStartUtcMs,
   SECONDS_IN_DAY,
   MILLISECONDS_IN_DAY,
+  MILLISECONDS_IN_HOUR,
   calculateAvailabilityGrid,
   normalizeAvailability,
   isMinuteAvailable,
@@ -117,6 +120,13 @@ deleteTimeInterval("1");
 // --- math and availability -------------------------------------------------
 
 const duration: string = formatDurationShort(5400);
+const zonedDayStart: number = getStartOfZonedDayUtcMs("Europe/Berlin");
+const viewedDayStart: number = getViewDayStartUtcMs(
+  "Europe/Berlin",
+  new Date(),
+  -1,
+);
+const hourMs: number = MILLISECONDS_IN_HOUR;
 const delta: string | null = formatDeltaToLocal(25200);
 const offset: number | null = getTimeZoneOffsetSecondsSafe("Asia/Bangkok", new Date());
 const day: number = SECONDS_IN_DAY + MILLISECONDS_IN_DAY;

@@ -22,6 +22,7 @@ export const VerticalMarker = ({
   backgroundColor,
   cursor,
   topTailChildren,
+  pieceStyle,
 }) => (
   <>
     <S.TimePointTail
@@ -35,6 +36,7 @@ export const VerticalMarker = ({
         borderTopRightRadius: "90%",
         borderTopLeftRadius: "90%",
         backgroundColor,
+        ...pieceStyle,
       }}
     >
       {topTailChildren}
@@ -49,6 +51,7 @@ export const VerticalMarker = ({
         zIndex: zIndexFloors.basement,
         cursor,
         backgroundColor,
+        ...pieceStyle,
       }}
     />
     <S.TimePointTail
@@ -62,6 +65,7 @@ export const VerticalMarker = ({
         borderBottomRightRadius: "90%",
         borderBottomLeftRadius: "90%",
         backgroundColor,
+        ...pieceStyle,
       }}
     />
   </>
@@ -74,12 +78,17 @@ VerticalMarker.propTypes = {
   backgroundColor: PropTypes.string,
   cursor: PropTypes.string,
   topTailChildren: PropTypes.node,
+  // Merged into each piece separately (never a wrapper) so a fade doesn't
+  // create a group stacking context and break the basement/base z-interleave
+  // of the hand body behind the rows' frosted glass.
+  pieceStyle: PropTypes.object,
 };
 
 const TimeIntervalMarker = ({
   timeInterval,
   posKey,
   size,
+  faded,
   onAddCalendarEvent,
   onDeleteTimePoint,
   onResizeStart,
@@ -92,12 +101,17 @@ const TimeIntervalMarker = ({
 
   const left = timeInterval[posKey] - size.leftListOffset;
   const lineWidth = theme.uiScale * theme.size.clockHand;
+  const fadeStyle = {
+    opacity: faded ? 0 : 1,
+    transition: "opacity 0.18s ease",
+  };
 
   return (
     <S.TimePoint
       style={{
         fontSize: `${theme.uiScale * 150}%`,
-        pointerEvents: timeInterval.mode === "fixed" ? "auto" : "none",
+        pointerEvents:
+          !faded && timeInterval.mode === "fixed" ? "auto" : "none",
       }}
     >
       {/* The grab surface: a wide invisible strip centered on the hand, so the
@@ -110,6 +124,7 @@ const TimeIntervalMarker = ({
           height: size.bodyHeight + labelTailHeight * 2,
           left: left - (intervalHitStripWidth - lineWidth) / 2,
           width: intervalHitStripWidth,
+          ...fadeStyle,
         }}
         onPointerDown={onResizeStart}
       />
@@ -117,6 +132,7 @@ const TimeIntervalMarker = ({
         size={size}
         left={left}
         className="interval-marker-piece"
+        pieceStyle={fadeStyle}
         backgroundColor={theme.color.intervalHandBody}
         cursor={
           ["fixed", "resize"].includes(timeInterval.mode) ? "ew-resize" : "auto"
@@ -171,6 +187,9 @@ TimeIntervalMarker.propTypes = {
   timeInterval: PropTypes.object.isRequired,
   posKey: PropTypes.oneOf(["xPos1", "xPos2"]).isRequired,
   size: PropTypes.object.isRequired,
+  // Fades the marker out (and disables interaction) while the day window is
+  // being panned; positions stay anchored to the committed day page.
+  faded: PropTypes.bool,
   onAddCalendarEvent: PropTypes.func,
   onDeleteTimePoint: PropTypes.func.isRequired,
   onResizeStart: PropTypes.func.isRequired,

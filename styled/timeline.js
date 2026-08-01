@@ -2,6 +2,7 @@ import styled from "@emotion/styled";
 import { css } from "@emotion/react";
 
 import { timelineHomeNowCellPulse } from "./animations";
+import { zIndexFloors } from "../constants";
 
 export const TimeLineStory = styled.div`
   display: flex;
@@ -116,7 +117,10 @@ export const TimeLineItem = styled.div`
   position: relative;
   background: transparent;
 
-  -webkit-user-drag: element;
+  /* No -webkit-user-drag: element here: it made the whole row a native drag
+     source (reorder starts from the .timeline-drag-handle's draggable attr
+     instead), and a native drag cancels the pointer stream that horizontal
+     day-panning on the hour strip depends on. */
 
   &::before {
     content: "";
@@ -218,6 +222,73 @@ export const Hours = styled.div`
   flex-direction: row;
   width: 100%;
   max-width: 2400px;
+  /* Horizontal drags pan the day window (pointer events); vertical swipes
+     keep native list scrolling on touch devices. */
+  touch-action: pan-y;
+`;
+
+export const DayNav = styled.div`
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: ${({ theme }) => theme.uiScale * 130}%;
+  color: var(--text);
+  z-index: ${zIndexFloors.markerTail + 10};
+  background: ${({ theme }) =>
+    theme.mode === "dark"
+      ? "rgba(6, 10, 16, 0.6)"
+      : "rgba(255, 255, 255, 0.75)"};
+  border: 1px solid
+    ${({ theme }) =>
+      theme.mode === "dark"
+        ? "rgba(120, 200, 255, 0.16)"
+        : "rgba(9, 30, 66, 0.12)"};
+  box-shadow: ${({ theme }) =>
+    theme.mode === "dark"
+      ? "0 6px 18px rgba(0, 0, 0, 0.35)"
+      : "0 6px 18px rgba(9, 30, 66, 0.12)"};
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+`;
+
+export const DayNavButton = styled.button`
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 7px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1.3;
+
+  &:hover {
+    background: ${({ theme }) =>
+      theme.mode === "dark"
+        ? "rgba(120, 200, 255, 0.14)"
+        : "rgba(9, 30, 66, 0.08)"};
+  }
+`;
+
+export const DayNavLabel = styled.span`
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+
+  .day-nav-offset {
+    margin-left: 6px;
+    opacity: 0.6;
+    font-size: 0.82em;
+  }
 `;
 
 export const AvailabilityLayer = styled.span`
@@ -287,12 +358,14 @@ export const Hour = styled.div`
   border: ${({ isEmpty, theme, period }) =>
     isEmpty
       ? "none"
-      : `${theme.size.borderHour * theme.uiScale}px solid ${getHourBorderColor(
-          { theme, period },
-        )}`};
+      : `${theme.size.borderHour * theme.uiScale}px solid ${getHourBorderColor({
+          theme,
+          period,
+        })}`};
   border-left: none;
   font-size: ${({ theme }) => theme.uiScale * 150}%;
   position: relative;
+  cursor: ${({ isEmpty }) => (isEmpty ? "inherit" : "grab")};
   background-color: ${getHourPeriodBackground};
   background-image: ${({
     isEmpty,

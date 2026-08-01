@@ -20,7 +20,7 @@ import {
 } from "./constants";
 
 const HOUR_MAX_WIDTH = 100;
-const transition = "top 0.2s ease, transform 0.2s ease";
+const transition = "top 0.2s ease, transform 0.2s ease, opacity 0.18s ease";
 
 const StaticNowClockLabel = ({ timeZone, color }) => {
   return (
@@ -47,6 +47,9 @@ const TimeLineRow = ({
   size,
   colliderState,
   isNowXPosReady,
+  viewStartUtcMs,
+  isPanning,
+  showNowMarker,
   showTimezoneAbbreviation,
   minimal,
   deltaBase,
@@ -68,6 +71,17 @@ const TimeLineRow = ({
   const clockCtx = useTimeZonesClock();
 
   const paddingTop = size.timeLineItemHeaderHeight / 2;
+
+  // "Now" UI is only meaningful while the viewed window is today's page and
+  // the strip isn't mid-pan; hosts that render rows standalone keep the old
+  // measurement-only gating.
+  const showNowUi = showNowMarker ?? isNowXPosReady;
+  // Interval hands/clocks are anchored to the committed day page, so they
+  // fade out while the strip is being panned by hours.
+  const panFadeStyle = {
+    opacity: isPanning ? 0 : 1,
+    transition: "opacity 0.18s ease",
+  };
 
   const highlight = getLineHighlight?.(timeLine) ?? null;
 
@@ -159,7 +173,8 @@ const TimeLineRow = ({
                 whiteSpace: "nowrap",
                 left: "var(--homeDayPassedXPos)",
                 transition,
-                opacity: isNowXPosReady ? 1 : 0,
+                opacity: showNowUi ? 1 : 0,
+                pointerEvents: showNowUi ? undefined : "none",
                 transform: [
                   "translateX(",
                   colliderState.timeZonesClock.side === "left"
@@ -171,8 +186,8 @@ const TimeLineRow = ({
                 top: colliderState.timeZonesClock.top,
                 fontSize: colliderState.timeZonesClock.fontSize,
                 zIndex: colliderState.timeZonesClock.zIndex,
-                backdropFilter: isNowXPosReady ? backdropFilter : "none",
-                WebkitBackdropFilter: isNowXPosReady ? backdropFilter : "none",
+                backdropFilter: showNowUi ? backdropFilter : "none",
+                WebkitBackdropFilter: showNowUi ? backdropFilter : "none",
               }}
             >
               <StaticNowClockLabel
@@ -202,6 +217,8 @@ const TimeLineRow = ({
                         position: "absolute",
                         left: timeInterval[posKey] - size.leftListOffset,
                         transition,
+                        opacity: isPanning ? 0 : 1,
+                        pointerEvents: isPanning ? "none" : undefined,
                         transform: `translateX(${
                           clockCollider.side === "left"
                             ? -(100 + clockXTransformPercent)
@@ -431,6 +448,8 @@ const TimeLineRow = ({
         hourMaxWidth={HOUR_MAX_WIDTH}
         timer={clockCtx?.timer}
         availabilityCells={availabilityCells}
+        viewStartUtcMs={viewStartUtcMs}
+        isPanning={isPanning}
       />
       {/* Crisp within-row segments of the interval hands. The full-height
           marker line (rendered at the Timespace level) sits at basement
@@ -451,22 +470,27 @@ const TimeLineRow = ({
                     left: timeInterval[posKey] - size.leftListOffset,
                     backgroundColor: theme.color.intervalHandBody,
                     pointerEvents: "none",
+                    ...panFadeStyle,
                   }}
                 />
               ),
           )}
         </Fragment>
       ))}
-      <S.TimePointBody
-        className="timeline-now-line timeline-now-line-segment"
-        style={{
-          position: "absolute",
-          height: "100%",
-          top: 0,
-          left: "var(--homeDayPassedXPos)",
-          pointerEvents: "none",
-        }}
-      />
+      {/* Conditional render (not opacity): the now-line glow animation
+          animates opacity itself, so an inline opacity: 0 would lose. */}
+      {showNowUi && (
+        <S.TimePointBody
+          className="timeline-now-line timeline-now-line-segment"
+          style={{
+            position: "absolute",
+            height: "100%",
+            top: 0,
+            left: "var(--homeDayPassedXPos)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
     </S.TimeLineItem>
   );
 };
@@ -479,6 +503,9 @@ TimeLineRow.propTypes = {
   size: PropTypes.object.isRequired,
   colliderState: PropTypes.object.isRequired,
   isNowXPosReady: PropTypes.bool,
+  viewStartUtcMs: PropTypes.number,
+  isPanning: PropTypes.bool,
+  showNowMarker: PropTypes.bool,
   showTimezoneAbbreviation: PropTypes.bool,
   minimal: PropTypes.bool,
   deltaBase: PropTypes.oneOf(["local", "home"]),
