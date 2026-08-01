@@ -27,6 +27,9 @@ Free horizontal scrolling — the day snapping from 0.5.0 is gone.
   (`+3h`, `-1d 4h`); ‹ › align to the previous/next real (DST-correct) day
   start — ‹ from a mid-day position first aligns to the viewed day's own
   start — and Today resets to 0.
+- **Label collisions resolve on every scroll step**: as the now clock slides
+  through a drag, the collision pass re-runs per hour step, so it and the
+  row-name block dodge each other live instead of only on release.
 
 ## 0.5.0
 

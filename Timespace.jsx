@@ -1,6 +1,7 @@
 import {
   Fragment,
   useCallback,
+  useEffect,
   useRef,
   useState,
   useMemo,
@@ -273,6 +274,16 @@ const Timespace = ({
   const showNowMarker = isNowXPosReady && isNowInView;
   const effectiveOffsetHours =
     (viewStartUtcMs - todayStartUtcMs) / MILLISECONDS_IN_HOUR;
+
+  // The now clock/line slides with the window while panning (CSS var), but
+  // its side/stacking and the row-name side come from the collision pass —
+  // re-run it on every window move (each hour step of a drag included) so
+  // the labels dodge each other live, not only on release. Runs one commit
+  // after TimespaceClockSync has written the new now position into
+  // homeDayPassedXPosRef, so the pass reads the fresh x.
+  useEffect(() => {
+    requestCollisionResolution();
+  }, [viewStartUtcMs, requestCollisionResolution]);
 
   const viewDayLabel = useMemo(() => {
     return new Intl.DateTimeFormat("en-US", {
