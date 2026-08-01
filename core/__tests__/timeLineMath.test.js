@@ -6,15 +6,14 @@ import {
   calculateFontSize,
   calculateTopOffset,
   formatDeltaToLocal,
+  formatHourOffsetLabel,
+  getAdjacentDayStartOffsetHours,
   getBoundaryPositions,
-  getPanCommitDayDelta,
   getSecondsFromStartOfDay,
   getStartOfZonedDayUtcMs,
   getTimeZoneOffsetSecondsSafe,
-  getViewDayStartUtcMs,
   getXPosFromDayOffset,
   MILLISECONDS_IN_DAY,
-  PAN_COMMIT_REMAINDER_HOURS,
   SECONDS_IN_DAY,
 } from "../timeLineMath";
 
@@ -167,6 +166,19 @@ describe("core/timeLineMath", () => {
         size.hoursLineWidth / 2 + size.leftOffset + size.leftListOffset,
       );
     });
+
+    it("shifts by the view offset and wraps earlier times to the next day", () => {
+      const size = makeSize();
+      const viewOffsetSeconds = 3 * 3600;
+      // 9:00 on a window starting at 3:00 sits 6h in.
+      expect(getXPosFromDayOffset(9 * 3600, size, viewOffsetSeconds)).toBe(
+        (6 / 24) * size.hoursLineWidth + size.leftOffset + size.leftListOffset,
+      );
+      // 1:00 is before the window start, so it wraps to tomorrow's 1:00 (22h in).
+      expect(getXPosFromDayOffset(1 * 3600, size, viewOffsetSeconds)).toBe(
+        (22 / 24) * size.hoursLineWidth + size.leftOffset + size.leftListOffset,
+      );
+    });
   });
 
   describe("getStartOfZonedDayUtcMs", () => {
@@ -182,65 +194,61 @@ describe("core/timeLineMath", () => {
     });
   });
 
-  describe("getViewDayStartUtcMs", () => {
-    const baseDate = new Date("2026-07-15T10:00:00Z");
-
-    it("returns the same day's start for offset 0", () => {
-      expect(getViewDayStartUtcMs("Etc/UTC", baseDate, 0)).toBe(
-        Date.parse("2026-07-15T00:00:00Z"),
-      );
-    });
-
-    it("shifts by whole days in both directions", () => {
-      expect(getViewDayStartUtcMs("Etc/UTC", baseDate, 1)).toBe(
-        Date.parse("2026-07-16T00:00:00Z"),
-      );
-      expect(getViewDayStartUtcMs("Etc/UTC", baseDate, -3)).toBe(
-        Date.parse("2026-07-12T00:00:00Z"),
-      );
-    });
-
-    it("stays day-aligned across a 23-hour DST day", () => {
-      // Berlin springs forward on 2026-03-29: that day is 23 hours long.
-      const beforeTransition = new Date("2026-03-28T12:00:00Z");
-      // 2026-03-28 starts at 23:00Z (CET, +1); 2026-03-30 at 22:00Z (CEST, +2).
-      expect(getViewDayStartUtcMs("Europe/Berlin", beforeTransition, 0)).toBe(
-        Date.parse("2026-03-27T23:00:00Z"),
-      );
-      expect(getViewDayStartUtcMs("Europe/Berlin", beforeTransition, 2)).toBe(
-        Date.parse("2026-03-29T22:00:00Z"),
-      );
+  describe("formatHourOffsetLabel", () => {
+    it("formats zero, hours-only and day+hour offsets", () => {
+      expect(formatHourOffsetLabel(0)).toBe("0h");
+      expect(formatHourOffsetLabel(3)).toBe("+3h");
+      expect(formatHourOffsetLabel(-5)).toBe("-5h");
+      expect(formatHourOffsetLabel(24)).toBe("+1d");
+      expect(formatHourOffsetLabel(-24)).toBe("-1d");
+      expect(formatHourOffsetLabel(27)).toBe("+1d 3h");
+      expect(formatHourOffsetLabel(-49)).toBe("-2d 1h");
     });
   });
 
-  describe("getPanCommitDayDelta", () => {
-    it("springs back below the remainder threshold", () => {
-      expect(getPanCommitDayDelta(0)).toBe(0);
-      expect(getPanCommitDayDelta(PAN_COMMIT_REMAINDER_HOURS - 1)).toBe(0);
-      expect(getPanCommitDayDelta(-(PAN_COMMIT_REMAINDER_HOURS - 1))).toBe(0);
+  describe("getAdjacentDayStartOffsetHours", () => {
+    const baseDate = new Date("2026-07-15T10:00:00Z");
+
+    it("steps to the next and previous day starts from an aligned window", () => {
+      expect(getAdjacentDayStartOffsetHours("Etc/UTC", baseDate, 0, 1)).toBe(
+        24,
+      );
+      expect(getAdjacentDayStartOffsetHours("Etc/UTC", baseDate, 0, -1)).toBe(
+        -24,
+      );
+      expect(getAdjacentDayStartOffsetHours("Etc/UTC", baseDate, 48, 1)).toBe(
+        72,
+      );
     });
 
-    it("pages one day past the threshold", () => {
-      expect(getPanCommitDayDelta(PAN_COMMIT_REMAINDER_HOURS)).toBe(1);
-      expect(getPanCommitDayDelta(-PAN_COMMIT_REMAINDER_HOURS)).toBe(-1);
-      expect(getPanCommitDayDelta(23)).toBe(1);
+    it("going backwards from mid-day first aligns to the viewed day's start", () => {
+      expect(getAdjacentDayStartOffsetHours("Etc/UTC", baseDate, 3, -1)).toBe(
+        0,
+      );
+      expect(getAdjacentDayStartOffsetHours("Etc/UTC", baseDate, 27, -1)).toBe(
+        24,
+      );
+      expect(getAdjacentDayStartOffsetHours("Etc/UTC", baseDate, 3, 1)).toBe(
+        24,
+      );
     });
 
-    it("keeps every full day-width dragged", () => {
-      expect(getPanCommitDayDelta(24)).toBe(1);
-      expect(getPanCommitDayDelta(50)).toBe(2);
-      expect(getPanCommitDayDelta(55)).toBe(3);
-      expect(getPanCommitDayDelta(-55)).toBe(-3);
-    });
-
-    it("lets a flick page without the distance", () => {
-      expect(getPanCommitDayDelta(2, 1)).toBe(1);
-      expect(getPanCommitDayDelta(-2, -1)).toBe(-1);
-      expect(getPanCommitDayDelta(26, 1)).toBe(2);
-    });
-
-    it("ignores the flick once the threshold decided", () => {
-      expect(getPanCommitDayDelta(23, -1)).toBe(1);
+    it("lands on real day boundaries across a 23-hour DST day", () => {
+      // Berlin springs forward on 2026-03-29: that day is 23 hours long.
+      const beforeTransition = new Date("2026-03-28T12:00:00Z");
+      // Today (Mar 28) starts 23:00Z Mar 27; Mar 29 starts 23:00Z Mar 28;
+      // Mar 30 starts 22:00Z Mar 29 — only 23 uniform hours later.
+      expect(
+        getAdjacentDayStartOffsetHours("Europe/Berlin", beforeTransition, 0, 1),
+      ).toBe(24);
+      expect(
+        getAdjacentDayStartOffsetHours(
+          "Europe/Berlin",
+          beforeTransition,
+          24,
+          1,
+        ),
+      ).toBe(47);
     });
   });
 
@@ -252,9 +260,45 @@ describe("core/timeLineMath", () => {
       expect(getSecondsFromStartOfDay(xPos, size)).toBeCloseTo(secondsIn, 6);
     });
 
+    it("is the inverse on a shifted window, including across the wrap", () => {
+      const size = makeSize();
+      const viewOffsetSeconds = 3 * 3600;
+      for (const secondsIn of [0, 1 * 3600, 2.5 * 3600, 9 * 3600, 23 * 3600]) {
+        const xPos = getXPosFromDayOffset(secondsIn, size, viewOffsetSeconds);
+        expect(
+          getSecondsFromStartOfDay(xPos, size, viewOffsetSeconds),
+        ).toBeCloseTo(secondsIn, 6);
+      }
+    });
+
+    it("keeps the legacy inclusive end-of-day on a day-aligned view", () => {
+      const size = makeSize();
+      const rightEdge =
+        size.hoursLineWidth + size.leftOffset + size.leftListOffset;
+      expect(getSecondsFromStartOfDay(rightEdge, size)).toBe(SECONDS_IN_DAY);
+    });
+
     it("tolerates a missing leftListOffset", () => {
       const size = makeSize({ leftListOffset: undefined });
       expect(getSecondsFromStartOfDay(size.leftOffset, size)).toBe(0);
+    });
+  });
+
+  describe("calculateDurationData durationSeconds override", () => {
+    it("prefers the endpoint-time duration over the pixel span", () => {
+      const size = makeSize();
+      // A 2h interval straddling a scrolled window's seam renders 22h apart.
+      const data = calculateDurationData({
+        xPos1: 0,
+        xPos2: (22 / 24) * size.hoursLineWidth,
+        hoursLineWidth: size.hoursLineWidth,
+        durationSeconds: 2 * 3600,
+      });
+      expect(data.durationSeconds).toBe(2 * 3600);
+      expect(data.durationPixels).toBeCloseTo(
+        (2 / 24) * size.hoursLineWidth,
+        6,
+      );
     });
   });
 });

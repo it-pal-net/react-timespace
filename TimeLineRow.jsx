@@ -72,12 +72,12 @@ const TimeLineRow = ({
 
   const paddingTop = size.timeLineItemHeaderHeight / 2;
 
-  // "Now" UI is only meaningful while the viewed window is today's page and
-  // the strip isn't mid-pan; hosts that render rows standalone keep the old
-  // measurement-only gating.
+  // "Now" UI shows whenever the current time falls inside the scrolled
+  // window (its position tracks the window); hosts that render rows
+  // standalone keep the old measurement-only gating.
   const showNowUi = showNowMarker ?? isNowXPosReady;
-  // Interval hands/clocks are anchored to the committed day page, so they
-  // fade out while the strip is being panned by hours.
+  // Interval hands/clocks are anchored to the committed scroll position, so
+  // they fade out while the strip is being panned by hours.
   const panFadeStyle = {
     opacity: isPanning ? 0 : 1,
     transition: "opacity 0.18s ease",

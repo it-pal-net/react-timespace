@@ -20,10 +20,11 @@ anywhere with one script tag (see [Embedding](#embedding)).
 
 - **One row per time zone** with hour ticks, live clocks, and a glowing
   "now" hand that moves through the day.
-- **Drag to other days**: grab the hour strip and pan horizontally — the 24h
-  window slides live and the release pages to the previous/next day (a quick
-  flick works too). A floating pill shows the viewed date with ‹ › / Today
-  controls; state lives in `tzState.viewDayOffset`.
+- **Drag to scroll through time**: grab the hour strip and pan horizontally —
+  the 24h window scrolls in one-hour steps and stays exactly where you drop
+  it, across as many days as you like. A floating pill shows the window-start
+  date and offset (`+3h`, `-1d 4h`) with ‹ › day-align and Today controls;
+  state lives in `tzState.viewOffsetHours`.
 - **Draggable time intervals**: resize either endpoint, or drag the duration
   arrow to move the whole range. Snapping: default to a configurable step,
   `Ctrl/Cmd` for 1s, `Shift` for 5 minutes.

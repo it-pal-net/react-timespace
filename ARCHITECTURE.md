@@ -14,8 +14,8 @@ interactive "time interval" handles you can drag to select a range.
   - resize interval endpoints (pointerdown on a 16px grab strip centered on
     each hand, then window-level pointermove/pointerup)
   - move the whole interval range (drag the duration arrow — line or text)
-  - pan the day window (pointerdown on the hour strip, hour-stepped live
-    preview, whole-day commit on release)
+  - scroll the 24h window (pointerdown on the hour strip, hour-stepped live
+    preview, the dragged hours commit as-is on release)
 - **Measurement & geometry**:
   - measure list/header/hour widths and offsets
   - convert between pixels and "seconds from start of day"
@@ -117,44 +117,60 @@ persist `*DayOffsetSeconds`.
   - owns timeline reorder drag & drop + ghost overlay (appended into
     `portalContainer`, falling back to `#content` then `document.body`)
 
-- **`hooks/useTimelineDayPan.js`**
-  - owns horizontal drag-panning of the day window (same window-listener
+- **`hooks/useTimelinePan.js`**
+  - owns horizontal drag-scrolling of the 24h window (same window-listener
     pattern as interval drags; Escape cancels)
   - while dragging, `panHours` shifts the rendered window in whole hours; the
-    release commits whole days into `tzState.viewDayOffset` via
-    `getPanCommitDayDelta` (full day-widths + threshold/flick remainder)
+    release adds exactly those hours to `tzState.viewOffsetHours` — no
+    snapping, the window stays where it was dropped
 
 - **`state/timeZonesProvider.jsx`**
   - the provider: resource reducer (timeLines/timeIntervals), a
     boundary-aligned ticker, per-zone `Intl.DateTimeFormat` clocks and offsets
 
-## Day paging (`viewDayOffset`)
+## Scrolling through time (`viewOffsetHours`)
 
-The timeline always renders a 24h window. `tzState.viewDayOffset` (0 = today
-in the home zone) picks which day-aligned page it is; committed pages are
-DST-correct day boundaries (`getViewDayStartUtcMs`). During an active pan the
-window start is additionally shifted by whole hours (`panHours`), so hour
-labels, weekday/day-start markers and past/now shading are all derived
-per-cell from the actual boundary instants (`TimeLine` formats each column's
-instant in the row's zone).
+The timeline always renders a 24h window. `tzState.viewOffsetHours` (0 =
+today's start in the home zone) says how many hours the window is scrolled;
+during an active pan the transient `panHours` shifts it further. Hour labels,
+weekday/day-start markers and past/now shading are all derived per-cell from
+the actual boundary instants (`TimeLine` formats each column's instant in the
+row's zone), so any window — including one spanning two days or a DST
+transition — renders its true local hours.
 
-While panning, everything anchored to the committed page fades out (interval
-hands/clocks, duration arrow, availability bands); the "now" line/clocks are
-only shown on today's page. On other pages the now-clock's collision box is
-parked off-screen — on whichever side of the name-side threshold today's
-clock is — so labels don't dodge a phantom and the row-name block never flips
-sides when paging. A floating pill (top center) shows the viewed date with
-‹ › / Today controls whenever `viewDayOffset !== 0`.
+The "now" line and per-row clocks are positioned relative to the window start
+(`TimespaceClockSync`), so they slide with the cells and appear whenever the
+current time is inside the window. When it is outside, the now-clock's
+collision box is parked far off-screen — on whichever side of the name-side
+threshold it left through — so labels don't dodge a phantom and the row-name
+block doesn't flip sides while scrolling away.
+
+Interval times-of-day map onto the window through
+`getXPosFromDayOffset(…, viewOffsetSeconds)`: a time earlier than the
+window's left edge wraps to the next calendar day, so every interval keeps
+exactly one strip position. An interval that straddles the wrap seam renders
+its endpoints in swapped pixel order — the min/max duration arrow is
+suppressed in that state, and durations are derived from the endpoint times
+(never the pixel span) so they survive any view. While panning, interval
+hands/clocks, the duration arrow and availability bands fade out (they are
+anchored to the committed offset) and return on release; availability is
+recomputed for the exact committed window.
+
+A floating pill (top center) shows the window-start date plus a compact
+offset label whenever the window is scrolled; ‹ › jump to the previous/next
+real (DST-correct) day start via `getAdjacentDayStartOffsetHours`, and Today
+resets to 0.
 
 ## Interaction rules (UX)
 
-### Day panning
+### Scrolling
 
 - drag anywhere on an hour strip (cursor: `grab`); headers, clocks, interval
   grab strips and the row drag handle keep their own gestures
-- release commits `trunc(draggedHours / 24)` days, plus one more when the
-  remainder is ≥ 6h — or on a flick (≥ 0.4 px/ms over the last 120ms)
-- a short slow drag springs back; Escape cancels; on touch, `touch-action:
+- the strip follows in one-hour steps and the release commits exactly the
+  dragged hours — no snapping, no spring-back (drags under half an hour-width
+  round to zero)
+- Escape cancels and restores the pre-drag offset; on touch, `touch-action:
   pan-y` keeps vertical list scrolling native
 
 ### Interval snapping

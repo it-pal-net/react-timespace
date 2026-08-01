@@ -139,60 +139,93 @@ export function getStartOfZonedDayUtcMs(timeZone, date = new Date()) {
 }
 
 /**
- * Start of the day `dayOffset` days away from `date`'s day in `timeZone`.
- * Aiming at the middle of the target day before snapping to its start keeps
- * the result correct across 23/25-hour DST days.
+ * The view offset in hours of the day boundary adjacent to the current
+ * window start — used by the ‹ › controls to re-align a freely scrolled
+ * window to real (DST-correct) home-zone day starts. Going backwards from a
+ * mid-day position first aligns to the start of the day being viewed.
  */
-export function getViewDayStartUtcMs(timeZone, date, dayOffset = 0) {
-  const todayStartMs = getStartOfZonedDayUtcMs(timeZone, date);
-  if (!dayOffset) {
-    return todayStartMs;
-  }
-  return getStartOfZonedDayUtcMs(
+export function getAdjacentDayStartOffsetHours(
+  timeZone,
+  nowDate,
+  offsetHours,
+  direction,
+) {
+  const todayStartMs = getStartOfZonedDayUtcMs(timeZone, nowDate);
+  const windowStartMs = todayStartMs + offsetHours * MILLISECONDS_IN_HOUR;
+  const viewedDayStartMs = getStartOfZonedDayUtcMs(
     timeZone,
-    new Date(
-      todayStartMs + dayOffset * MILLISECONDS_IN_DAY + MILLISECONDS_IN_DAY / 2,
-    ),
+    new Date(windowStartMs),
   );
-}
 
-// Releasing a day pan with less than this many hours of remainder (and no
-// flick) springs back instead of paging to the neighbour day.
-export const PAN_COMMIT_REMAINDER_HOURS = 6;
-
-/**
- * How many whole days a released drag-pan commits: every full day-width
- * dragged, plus one more day when the remainder passes the threshold or the
- * release was a flick. Positive = toward later days.
- */
-export function getPanCommitDayDelta(draggedHours, flickDayDirection = 0) {
-  const fullDays = Math.trunc(draggedHours / 24);
-  const remainderHours = draggedHours - fullDays * 24;
-
-  let extraDays = 0;
-  if (Math.abs(remainderHours) >= PAN_COMMIT_REMAINDER_HOURS) {
-    extraDays = Math.sign(remainderHours);
-  } else if (flickDayDirection) {
-    extraDays = flickDayDirection;
+  let targetMs;
+  if (direction > 0) {
+    // Aim well past the current day's end; snapping lands on the next start.
+    targetMs = getStartOfZonedDayUtcMs(
+      timeZone,
+      new Date(viewedDayStartMs + 36 * MILLISECONDS_IN_HOUR),
+    );
+  } else if (windowStartMs > viewedDayStartMs) {
+    targetMs = viewedDayStartMs;
+  } else {
+    targetMs = getStartOfZonedDayUtcMs(
+      timeZone,
+      new Date(viewedDayStartMs - 12 * MILLISECONDS_IN_HOUR),
+    );
   }
 
-  return fullDays + extraDays;
+  return (targetMs - todayStartMs) / MILLISECONDS_IN_HOUR;
 }
 
-export function getXPosFromDayOffset(secondsOffsetFromDay, size) {
+// "+3h", "-5h", "+1d", "-1d 4h" — compact label for a view offset in hours.
+export function formatHourOffsetLabel(offsetHours) {
+  if (!offsetHours) {
+    return "0h";
+  }
+  const sign = offsetHours > 0 ? "+" : "-";
+  const absHours = Math.abs(offsetHours);
+  const days = Math.floor(absHours / 24);
+  const hours = absHours - days * 24;
+
+  if (days === 0) {
+    return `${sign}${hours}h`;
+  }
+  return `${sign}${days}d${hours ? ` ${hours}h` : ""}`;
+}
+
+// `viewOffsetSeconds` shifts the strip's origin: with a freely scrolled
+// window the left edge is `viewOffsetSeconds` into the home day, and a
+// time-of-day earlier than that appears on the next calendar day — a single
+// wrap keeps every time-of-day at exactly one position on the strip.
+export function getXPosFromDayOffset(
+  secondsOffsetFromDay,
+  size,
+  viewOffsetSeconds = 0,
+) {
   if (secondsOffsetFromDay == null) {
     return null;
   }
 
-  const proportionOfDay = secondsOffsetFromDay / SECONDS_IN_DAY;
+  let relativeSeconds = secondsOffsetFromDay - viewOffsetSeconds;
+  if (relativeSeconds < 0) {
+    relativeSeconds += SECONDS_IN_DAY;
+  }
+
+  const proportionOfDay = relativeSeconds / SECONDS_IN_DAY;
   const position = proportionOfDay * size.hoursLineWidth;
   return position + size.leftOffset + size.leftListOffset;
 }
 
-export function getSecondsFromStartOfDay(xPos, size) {
+export function getSecondsFromStartOfDay(xPos, size, viewOffsetSeconds = 0) {
   const adjustedPosition = xPos - (size.leftListOffset ?? 0) - size.leftOffset;
   const proportionOfTimeline = adjustedPosition / size.hoursLineWidth;
-  return (proportionOfTimeline * MILLISECONDS_IN_DAY) / 1000;
+  const seconds =
+    (proportionOfTimeline * MILLISECONDS_IN_DAY) / 1000 + viewOffsetSeconds;
+  // Day-aligned views keep the legacy 0..86400 inclusive range (a flush-right
+  // endpoint is "end of day", not "start of day"); shifted windows wrap.
+  if (viewOffsetSeconds > 0 && seconds >= SECONDS_IN_DAY) {
+    return seconds - SECONDS_IN_DAY;
+  }
+  return seconds;
 }
 
 // Compact duration like "1h 30m": the two largest non-zero units of h/m/s.
@@ -217,15 +250,24 @@ export function calculateDurationData({
   xPos2,
   hoursLineWidth,
   formatDuration = formatDurationShort,
+  // On a scrolled window a seam-straddling interval renders its endpoints in
+  // swapped pixel order, so the pixel span is the day-complement of the real
+  // range — callers that know the endpoint times pass the true duration here.
+  durationSeconds: durationSecondsOverride,
 }) {
   const isIntervalHasBothPoints = xPos1 !== null && xPos2 !== null;
   if (isIntervalHasBothPoints) {
     const startPosition = Math.min(xPos1, xPos2);
     const endPosition = Math.max(xPos1, xPos2);
-    const durationPixels = Math.abs(endPosition - startPosition);
-    const durationSeconds = Math.round(
+    let durationPixels = Math.abs(endPosition - startPosition);
+    let durationSeconds = Math.round(
       ((durationPixels / hoursLineWidth) * MILLISECONDS_IN_DAY) / 1000,
     );
+    if (durationSecondsOverride != null) {
+      durationSeconds = Math.round(durationSecondsOverride);
+      durationPixels =
+        ((durationSeconds * 1000) / MILLISECONDS_IN_DAY) * hoursLineWidth;
+    }
 
     const durationHuman = formatDuration(durationSeconds);
     const arrowMidPoint = (startPosition + endPosition) / 2;

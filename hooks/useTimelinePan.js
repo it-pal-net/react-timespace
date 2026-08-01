@@ -1,38 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getPanCommitDayDelta } from "../core/timeLineMath";
-
 // Engage the pan only after the pointer moved a few pixels, so stray clicks
 // on the hour strip never twitch the view.
 const PAN_SLOP_PIXELS = 6;
-// A fast release ("flick") pages even when the distance threshold wasn't
-// reached — matching the usual carousel/pager gesture.
-const FLICK_MIN_VELOCITY_PX_PER_MS = 0.4;
-const FLICK_MIN_DISTANCE_PIXELS = 16;
-const FLICK_SAMPLE_WINDOW_MS = 120;
 
 /**
- * Horizontal drag-to-pan over the hour strips: the 24h window slides in whole
- * hours while dragging, and the release commits whole home-zone days
- * (`viewDayOffset`) — full day-widths dragged plus one more day when the
- * remainder passes a threshold or the release is a flick.
+ * Horizontal drag-to-scroll over the hour strips: the 24h window slides in
+ * whole hours while dragging, and the release keeps the window exactly where
+ * it was left — the dragged hours are committed into
+ * `tzState.viewOffsetHours` (no day snapping).
  *
  * Gesture handling mirrors `useTimeIntervalDrag`: the drag starts from a
  * `pointerdown` on the hour strip and is tracked with window-level
  * pointermove/pointerup listeners so it survives the cursor leaving the list;
- * Escape cancels and springs back to the committed day.
+ * Escape cancels and restores the offset from before the drag.
  */
-export default function useTimelineDayPan({
+export default function useTimelinePan({
   size,
-  viewDayOffset,
-  onCommitDayOffset,
+  viewOffsetHours,
+  onCommitViewOffsetHours,
 }) {
   const [panHours, setPanHours] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
 
   // Latest render values, readable from the stable window-level handlers.
   const latestRef = useRef(null);
-  latestRef.current = { size, viewDayOffset, onCommitDayOffset };
+  latestRef.current = { size, viewOffsetHours, onCommitViewOffsetHours };
 
   const panRef = useRef(null);
   const teardownRef = useRef(null);
@@ -63,19 +56,10 @@ export default function useTimelineDayPan({
       setIsPanning(true);
     }
 
-    pan.lastClientX = pointer.clientX;
-    const now = pointer.timeStamp;
-    pan.samples.push({ t: now, x: pointer.clientX });
-    while (
-      pan.samples.length > 1 &&
-      now - pan.samples[0].t > FLICK_SAMPLE_WINDOW_MS
-    ) {
-      pan.samples.shift();
-    }
-
     // Dragging the strip left pulls later hours into view (positive pan).
     const hourWidth = sizes.hoursLineWidth / 24;
     const nextPanHours = -Math.round(deltaX / hourWidth);
+    pan.panHours = nextPanHours;
     setPanHours((current) =>
       current === nextPanHours ? current : nextPanHours,
     );
@@ -83,10 +67,7 @@ export default function useTimelineDayPan({
 
   const handlePointerMove = useCallback(
     (ev) => {
-      lastPointerRef.current = {
-        clientX: ev.clientX,
-        timeStamp: ev.timeStamp,
-      };
+      lastPointerRef.current = { clientX: ev.clientX };
       if (rafRef.current != null) {
         return;
       }
@@ -100,24 +81,6 @@ export default function useTimelineDayPan({
     [applyPointer],
   );
 
-  const getFlickDayDirection = useCallback((pan) => {
-    const newest = pan.samples[pan.samples.length - 1];
-    const oldest = pan.samples[0];
-    if (!newest || !oldest || newest.t <= oldest.t) {
-      return 0;
-    }
-    const distance = newest.x - oldest.x;
-    const velocity = distance / (newest.t - oldest.t);
-    if (
-      Math.abs(distance) < FLICK_MIN_DISTANCE_PIXELS ||
-      Math.abs(velocity) < FLICK_MIN_VELOCITY_PX_PER_MS
-    ) {
-      return 0;
-    }
-    // Flicking leftwards travels toward later days.
-    return velocity < 0 ? 1 : -1;
-  }, []);
-
   const stopPan = useCallback(
     ({ commit }) => {
       const teardown = teardownRef.current;
@@ -130,30 +93,17 @@ export default function useTimelineDayPan({
       setIsPanning(false);
       setPanHours(0);
 
-      if (!commit || pan == null || !pan.engaged) {
+      if (!commit || pan == null || !pan.engaged || !pan.panHours) {
         return;
       }
 
       const {
-        size: sizes,
-        viewDayOffset: committedOffset,
-        onCommitDayOffset: commitDayOffset,
+        viewOffsetHours: committedOffset,
+        onCommitViewOffsetHours: commitViewOffsetHours,
       } = latestRef.current;
-      if (!sizes?.hoursLineWidth) {
-        return;
-      }
-
-      const hourWidth = sizes.hoursLineWidth / 24;
-      const draggedHours = -(pan.lastClientX - pan.startClientX) / hourWidth;
-      const dayDelta = getPanCommitDayDelta(
-        draggedHours,
-        getFlickDayDirection(pan),
-      );
-      if (dayDelta !== 0) {
-        commitDayOffset?.((committedOffset ?? 0) + dayDelta);
-      }
+      commitViewOffsetHours?.((committedOffset ?? 0) + pan.panHours);
     },
-    [cancelPendingMove, getFlickDayDirection],
+    [cancelPendingMove],
   );
 
   const handlePanPointerDown = useCallback(
@@ -175,9 +125,8 @@ export default function useTimelineDayPan({
 
       panRef.current = {
         startClientX: ev.clientX,
-        lastClientX: ev.clientX,
         engaged: false,
-        samples: [{ t: ev.timeStamp, x: ev.clientX }],
+        panHours: 0,
       };
 
       const onPointerUp = () => stopPan({ commit: true });

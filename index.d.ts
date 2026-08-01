@@ -217,12 +217,13 @@ export interface TimeZonesState {
   /** Default drag snapping step. `Ctrl/Cmd` overrides to 1s, `Shift` to 5min. */
   intervalStepSeconds: number;
   /**
-   * Which home-zone day the timeline shows: `0` today, `-1` yesterday, `1`
-   * tomorrow, … Horizontal drag-panning over the hour strips commits whole
-   * days here; set it via `setState({ viewDayOffset })` to page
+   * How far the viewed 24h window is scrolled from the start of today in the
+   * home zone, in hours: `0` today, `24` tomorrow, `-3` yesterday 21:00, …
+   * Horizontal drag-scrolling over the hour strips commits the dragged hours
+   * here; set it via `setState({ viewOffsetHours })` to scroll
    * programmatically.
    */
-  viewDayOffset: number;
+  viewOffsetHours: number;
   timeLinesIds: string[];
   timeLinesMap: Record<string, TimeLine>;
   timeIntervalsIds: string[];
@@ -296,7 +297,10 @@ export declare function useTimeZonesClock(): TimeZonesClockContextValue;
 
 /** Replace the whole state, one key, or map it with a function. */
 export declare function setState(
-  keyOrRootValues: string | Record<string, unknown> | ((state: TimeZonesState) => TimeZonesState),
+  keyOrRootValues:
+    | string
+    | Record<string, unknown>
+    | ((state: TimeZonesState) => TimeZonesState),
   maybeValues?: Record<string, unknown>,
 ): TimeZonesAction;
 
@@ -316,7 +320,9 @@ export declare function updateTimeline(
 /** Takes the row id, not the row. */
 export declare function deleteTimeline(payload: string): TimeZonesAction;
 
-export declare function setTimeIntervals(payload: TimeInterval[]): TimeZonesAction;
+export declare function setTimeIntervals(
+  payload: TimeInterval[],
+): TimeZonesAction;
 export declare function addTimeInterval(payload: TimeInterval): TimeZonesAction;
 /** Shallow-merges `payload` into the interval with the same `id`. */
 export declare function updateTimeInterval(
@@ -440,16 +446,8 @@ export declare function getStartOfZonedDayUtcMs(
   date?: Date,
 ): number;
 
-/**
- * UTC ms of 00:00 of the day `dayOffset` days away from `date`'s day in
- * `timeZone` (DST-safe). Combine with `tzState.viewDayOffset` to resolve the
- * day page the timeline is showing.
- */
-export declare function getViewDayStartUtcMs(
-  timeZone: TimeZoneId,
-  date: Date,
-  dayOffset?: number,
-): number;
+/** `27` → `"+1d 3h"`, `-5` → `"-5h"`, `0` → `"0h"`. */
+export declare function formatHourOffsetLabel(offsetHours: number): string;
 
 // ---------------------------------------------------------------------------
 // Availability

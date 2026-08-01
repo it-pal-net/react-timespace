@@ -1,21 +1,28 @@
-import { useContext, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 
 import { useTimeZonesClock } from "./state/timeZonesProvider";
+import { MILLISECONDS_IN_DAY } from "./core/timeLineMath";
 
 /**
  * Small component that subscribes to the ticking clock context and updates
  * Timespace DOM (CSS vars / refs) without forcing `TimeLineList` to rerender each second.
+ *
+ * The "now" position is relative to the viewed 24h window (`viewStartUtcMs`),
+ * so a scrolled window keeps the hand glued to the correct hour column; when
+ * "now" is outside the window the position goes out of range and the
+ * consumers hide themselves.
  */
 export default function TimespaceClockSync({
   targetElRef,
   size,
   homeDayPassedXPosRef,
+  viewStartUtcMs,
   positionKey,
   onMinuteTick,
   onPositionReady,
 }) {
-  const { homeDayPassedPercent, timer } = useTimeZonesClock() ?? {};
+  const { timer } = useTimeZonesClock() ?? {};
   const lastMinuteRef = useRef(null);
   const lastSizeKeyRef = useRef(null);
 
@@ -27,9 +34,11 @@ export default function TimespaceClockSync({
       size?.leftListOffset == null
     )
       return;
-    if (homeDayPassedPercent == null) return;
+    if (timer == null || viewStartUtcMs == null) return;
 
-    const passedPixels = (size.hoursLineWidth * homeDayPassedPercent) / 100;
+    const windowDayFraction =
+      (timer * 1000 - viewStartUtcMs) / MILLISECONDS_IN_DAY;
+    const passedPixels = size.hoursLineWidth * windowDayFraction;
     // Two coordinate spaces are used:
     // - CSS var: relative to the timeline/list container
     // - collision math: viewport coordinates (used with drag/drop x positions)
@@ -55,7 +64,8 @@ export default function TimespaceClockSync({
       }
     }
   }, [
-    homeDayPassedPercent,
+    timer,
+    viewStartUtcMs,
     size?.hoursLineWidth,
     size?.leftOffset,
     size?.leftListOffset,
@@ -80,6 +90,8 @@ TimespaceClockSync.propTypes = {
   targetElRef: PropTypes.object,
   size: PropTypes.object,
   homeDayPassedXPosRef: PropTypes.object.isRequired,
+  // UTC ms of the viewed window's first column.
+  viewStartUtcMs: PropTypes.number,
   // Used to invalidate the "position ready" cache when the reference frame changes
   // without a size change (e.g. switching home zone).
   positionKey: PropTypes.string,

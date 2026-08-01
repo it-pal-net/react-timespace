@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.6.0
+
+Free horizontal scrolling — the day snapping from 0.5.0 is gone.
+
+### Changed
+
+- **Releasing a drag keeps the window exactly where you left it.** The hour
+  strip scrolls in whole-hour steps and commits the dragged hours as-is; the
+  0.5.0 behavior (spring back / snap to the next day) is removed. The state
+  moved from `tzState.viewDayOffset` (whole days) to **`tzState.viewOffsetHours`**
+  (hours from today's start in the home zone; set it via
+  `setState({ viewOffsetHours })`). `getViewDayStartUtcMs` is replaced by the
+  exported `formatHourOffsetLabel`.
+- **The "now" line and per-row clocks stay visible on any scrolled window that
+  contains the current time** — their position is derived from the window
+  start, so they slide with the cells during a pan and hide only when "now"
+  leaves the window.
+- **Intervals map onto the scrolled window.** A time-of-day earlier than the
+  window's left edge wraps to the next calendar day, so every interval keeps
+  exactly one position on the strip; durations are now derived from the
+  endpoint times (a seam-straddling interval no longer reads as its
+  day-complement, and its min/max arrow is suppressed while it straddles the
+  wrap seam). Availability bands are computed for the exact viewed window.
+- **The floating pill** now shows the window-start date plus a compact offset
+  (`+3h`, `-1d 4h`); ‹ › align to the previous/next real (DST-correct) day
+  start — ‹ from a mid-day position first aligns to the viewed day's own
+  start — and Today resets to 0.
+
 ## 0.5.0
 
 Horizontal drag-to-pan across days.

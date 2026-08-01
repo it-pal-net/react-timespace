@@ -161,7 +161,7 @@ function DemoTimespace() {
           + Add interval
         </button>
         <span style={hintStyle}>
-          Drag the hours sideways to change day · drag interval edges to
+          Drag the hours sideways to scroll through days · drag interval edges to
           resize · drag the arrow to move · drag rows to reorder
         </span>
       </div>

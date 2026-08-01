@@ -170,8 +170,9 @@ const initialState = {
   localZone: getLocalTimeZone(),
   localeZoneOffsetMinutes: 0,
   intervalStepSeconds: defaultIntervalStep,
-  // Which home-zone day the timeline shows: 0 = today, -1 = yesterday, …
-  viewDayOffset: 0,
+  // How far the viewed 24h window is scrolled from the start of today in the
+  // home zone, in hours (0 = today, 24 = tomorrow, -3 = yesterday 21:00, …).
+  viewOffsetHours: 0,
 
   timeLinesIds: [],
   timeLinesMap: {},

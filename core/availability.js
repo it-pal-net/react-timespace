@@ -90,21 +90,24 @@ function samplesToSegments(samples) {
 }
 
 /**
- * Maps local availability windows onto the home-zone day shown by Timespace.
+ * Maps local availability windows onto the 24h window shown by Timespace.
  * The returned object is keyed by timeline id and contains 24 cells. Each cell
  * has row availability segments and common-overlap segments (0..1 fractions).
+ * The window defaults to `date`'s home-zone day; a freely scrolled view passes
+ * its exact start via `windowStartUtcMs`.
  */
 export function calculateAvailabilityGrid(
   timeLines,
   homeZone,
   date = new Date(),
+  windowStartUtcMs = null,
 ) {
   const configured = timeLines
     .map((line) => ({ line, ranges: normalizeAvailability(line.availability) }))
     .filter(({ ranges }) => ranges.length > 0);
   if (configured.length === 0) return {};
 
-  const homeStart = getStartOfZonedDayUtcMs(homeZone, date);
+  const homeStart = windowStartUtcMs ?? getStartOfZonedDayUtcMs(homeZone, date);
   const samplesPerHour = 60 / SAMPLE_MINUTES;
   const sampleCount = 24 * samplesPerHour;
   const samplesById = {};

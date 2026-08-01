@@ -23,7 +23,7 @@ import DurationArrow from "./DurationArrow";
 import * as S from "./styled";
 import useTimeLineMeasurements from "./hooks/useTimeLineMeasurements";
 import useTimelineReorderDnD from "./hooks/useTimelineReorderDnD";
-import useTimelineDayPan from "./hooks/useTimelineDayPan";
+import useTimelinePan from "./hooks/useTimelinePan";
 import useTimeIntervalDrag, {
   getResizeTargetPosKey,
 } from "./hooks/useTimeIntervalDrag";
@@ -35,8 +35,10 @@ import resolveTimeLineCollisions from "./core/timeLineCollision";
 import {
   calculateDurationData,
   formatDeltaToLocal,
+  formatHourOffsetLabel,
+  getAdjacentDayStartOffsetHours,
+  getStartOfZonedDayUtcMs,
   getTimeZoneOffsetSecondsSafe,
-  getViewDayStartUtcMs,
   getXPosFromDayOffset,
   getSecondsFromStartOfDay,
   MILLISECONDS_IN_DAY,
@@ -107,24 +109,39 @@ const Timespace = ({
     day: "2-digit",
   }).format(nowDate);
 
-  // Committed day page shown by the timeline (0 = today in the home zone).
-  // Drag-panning shifts the rendered window by hours on top of this and
-  // commits whole days on release.
-  const viewDayOffset = tzState.viewDayOffset ?? 0;
-  const isViewingToday = viewDayOffset === 0;
-  const pageStartUtcMs = useMemo(
-    () => getViewDayStartUtcMs(tzState.homeZone, nowDate, viewDayOffset),
-    [tzState.homeZone, homeDayKey, viewDayOffset],
+  // How far the viewed 24h window is scrolled from the start of today in the
+  // home zone, in hours. Drag-panning previews further hours on top of this
+  // and commits exactly what was dragged on release — no day snapping.
+  const viewOffsetHours = tzState.viewOffsetHours ?? 0;
+  const todayStartUtcMs = useMemo(
+    () => getStartOfZonedDayUtcMs(tzState.homeZone, nowDate),
+    [tzState.homeZone, homeDayKey],
   );
+  const committedViewStartUtcMs =
+    todayStartUtcMs + viewOffsetHours * MILLISECONDS_IN_HOUR;
+
+  // Seconds into its home-zone day at the committed window's left edge —
+  // the strip origin for mapping interval times-of-day onto columns.
+  const viewOffsetSeconds = useMemo(() => {
+    if (!viewOffsetHours) {
+      return 0;
+    }
+    const viewedDayStartUtcMs = getStartOfZonedDayUtcMs(
+      tzState.homeZone,
+      new Date(committedViewStartUtcMs),
+    );
+    return (committedViewStartUtcMs - viewedDayStartUtcMs) / 1000;
+  }, [tzState.homeZone, committedViewStartUtcMs, viewOffsetHours]);
 
   const availabilityGrid = useMemo(
     () =>
       calculateAvailabilityGrid(
         timeLines,
         tzState.homeZone,
-        new Date(pageStartUtcMs + MILLISECONDS_IN_DAY / 2),
+        nowDate,
+        committedViewStartUtcMs,
       ),
-    [timeLines, tzState.homeZone, pageStartUtcMs],
+    [timeLines, tzState.homeZone, committedViewStartUtcMs],
   );
 
   const [showTimezoneAbbreviationStored] = useLocalStorage(
@@ -225,11 +242,53 @@ const Timespace = ({
   });
 
   const homeDayPassedXPosRef = useRef(0);
-  // On other day pages the "now" clock is hidden — park its collision box far
-  // off-screen so labels stop dodging a phantom, but keep it on the same side
-  // of the name-side threshold so paging never flips the row-name block.
+
+  const requestCollisionResolution = useCallback(() => {
+    setColliderTrigger((current) => current + 1);
+  }, []);
+
+  const handleCommitViewOffsetHours = useCallback(
+    (nextOffsetHours) => {
+      tzDispatch(setState({ viewOffsetHours: nextOffsetHours }));
+      // Interval positions and the now line move with the window; re-run
+      // label layout against the new offset.
+      requestCollisionResolution();
+    },
+    [requestCollisionResolution],
+  );
+
+  const { panHours, isPanning, handlePanPointerDown } = useTimelinePan({
+    size,
+    viewOffsetHours,
+    onCommitViewOffsetHours: handleCommitViewOffsetHours,
+  });
+
+  // First column of the rendered 24h window: the committed scroll position
+  // plus the in-flight drag preview (whole hours).
+  const viewStartUtcMs =
+    committedViewStartUtcMs + panHours * MILLISECONDS_IN_HOUR;
+  const nowMs = nowDate.getTime();
+  const isNowInView =
+    nowMs >= viewStartUtcMs && nowMs < viewStartUtcMs + MILLISECONDS_IN_DAY;
+  const showNowMarker = isNowXPosReady && isNowInView;
+  const effectiveOffsetHours =
+    (viewStartUtcMs - todayStartUtcMs) / MILLISECONDS_IN_HOUR;
+
+  const viewDayLabel = useMemo(() => {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: tzState.homeZone,
+    }).format(new Date(viewStartUtcMs));
+  }, [viewStartUtcMs, tzState.homeZone]);
+
+  // When "now" is outside the viewed window its clock is hidden — park the
+  // collision box far off-screen so labels stop dodging a phantom, but keep
+  // it on the same side of the name-side threshold so scrolling away never
+  // flips the row-name block.
   const getEffectiveNowXPos = () => {
-    if (isViewingToday) {
+    if (isNowInView) {
       return homeDayPassedXPosRef.current;
     }
     const nameSideThreshold =
@@ -240,13 +299,14 @@ const Timespace = ({
   };
 
   const calculatePositionFromDayOffset = useCallback(
-    (secondsOffsetFromDay) => getXPosFromDayOffset(secondsOffsetFromDay, size),
-    [size],
+    (secondsOffsetFromDay) =>
+      getXPosFromDayOffset(secondsOffsetFromDay, size, viewOffsetSeconds),
+    [size, viewOffsetSeconds],
   );
 
   const calculateSecondsFromStartOfDay = useCallback(
-    (xPos) => getSecondsFromStartOfDay(xPos, size),
-    [size],
+    (xPos) => getSecondsFromStartOfDay(xPos, size, viewOffsetSeconds),
+    [size, viewOffsetSeconds],
   );
 
   const collider = useCallback(
@@ -259,7 +319,7 @@ const Timespace = ({
         homeDayPassedXPos: getEffectiveNowXPos(),
         clockXTransformPercent,
       }),
-    [size, isViewingToday],
+    [size, isNowInView],
   );
 
   const { applyCollisionResolution } = useTimeLineCollisionResolution({
@@ -284,42 +344,6 @@ const Timespace = ({
     applyCollisionResolution,
     colliderTrigger: colliderTrigger + recomputeCollisionsKey,
   });
-
-  const requestCollisionResolution = useCallback(() => {
-    setColliderTrigger((current) => current + 1);
-  }, []);
-
-  const handleCommitDayOffset = useCallback(
-    (nextOffset) => {
-      tzDispatch(setState({ viewDayOffset: nextOffset }));
-      // The now clock (dis)appears with the page change; re-run label layout.
-      requestCollisionResolution();
-    },
-    [requestCollisionResolution],
-  );
-
-  const { panHours, isPanning, handlePanPointerDown } = useTimelineDayPan({
-    size,
-    viewDayOffset,
-    onCommitDayOffset: handleCommitDayOffset,
-  });
-
-  // First column of the rendered 24h window. Day-aligned when settled;
-  // shifted by whole hours while a drag-pan is in flight.
-  const viewStartUtcMs = pageStartUtcMs + panHours * MILLISECONDS_IN_HOUR;
-  const showNowMarker = isNowXPosReady && isViewingToday && !isPanning;
-
-  const viewDayLabel = useMemo(() => {
-    if (isViewingToday) {
-      return null;
-    }
-    return new Intl.DateTimeFormat("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      timeZone: tzState.homeZone,
-    }).format(new Date(pageStartUtcMs + MILLISECONDS_IN_DAY / 2));
-  }, [isViewingToday, pageStartUtcMs, tzState.homeZone]);
 
   const { handlePointerMove, handlePointerUp, handleDragStartTimePoint } =
     useTimeIntervalDrag({
@@ -396,6 +420,7 @@ const Timespace = ({
           targetElRef={rootElRef}
           size={size}
           homeDayPassedXPosRef={homeDayPassedXPosRef}
+          viewStartUtcMs={viewStartUtcMs}
           positionKey={tzState.homeZone}
           onMinuteTick={() => {
             setColliderTrigger((c) => c + 1);
@@ -491,7 +516,18 @@ const Timespace = ({
 
               {timeInterval.xPos1 !== null &&
                 timeInterval.xPos2 !== null &&
-                timeInterval.durationPixels !== null && (
+                timeInterval.durationPixels !== null &&
+                // On a scrolled window an interval can straddle the strip's
+                // wrap seam (its endpoints render in swapped pixel order);
+                // the min/max arrow would then span the wrong region, so
+                // only the hands render in that state.
+                !(
+                  timeInterval.xPos1DayOffsetSeconds != null &&
+                  timeInterval.xPos2DayOffsetSeconds != null &&
+                  timeInterval.xPos1DayOffsetSeconds <
+                    timeInterval.xPos2DayOffsetSeconds !==
+                    timeInterval.xPos1 < timeInterval.xPos2
+                ) && (
                   <DurationArrow
                     id={timeInterval.id}
                     startX={
@@ -526,8 +562,9 @@ const Timespace = ({
         {/* Gate on isNowXPosReady: until TimespaceClockSync has measured the list
           and set --homeDayPassedXPos, `left` collapses to 0 and the hand would
           paint alone in the top-left corner before the timeline renders.
-          showNowMarker additionally drops the hand while another day page is
-          shown or the window is mid-pan — "now" is off-window then. */}
+          showNowMarker additionally drops the hand whenever "now" is outside
+          the scrolled window; while it is inside, the hand slides with the
+          cells (the CSS var is derived from the same viewStartUtcMs). */}
         {showNowMarker && (
           <S.TimePoint
             style={{
@@ -544,31 +581,49 @@ const Timespace = ({
           </S.TimePoint>
         )}
 
-        {!isViewingToday && (
+        {effectiveOffsetHours !== 0 && (
           <S.DayNav data-timespace-day-nav>
             <S.DayNavButton
               type="button"
-              aria-label="Previous day"
-              onClick={() => handleCommitDayOffset(viewDayOffset - 1)}
+              aria-label="Previous day start"
+              onClick={() =>
+                handleCommitViewOffsetHours(
+                  getAdjacentDayStartOffsetHours(
+                    tzState.homeZone,
+                    nowDate,
+                    viewOffsetHours,
+                    -1,
+                  ),
+                )
+              }
             >
               ‹
             </S.DayNavButton>
             <S.DayNavLabel data-timespace-day-label>
               {viewDayLabel}
               <span className="day-nav-offset">
-                {viewDayOffset > 0 ? `+${viewDayOffset}d` : `${viewDayOffset}d`}
+                {formatHourOffsetLabel(effectiveOffsetHours)}
               </span>
             </S.DayNavLabel>
             <S.DayNavButton
               type="button"
-              aria-label="Next day"
-              onClick={() => handleCommitDayOffset(viewDayOffset + 1)}
+              aria-label="Next day start"
+              onClick={() =>
+                handleCommitViewOffsetHours(
+                  getAdjacentDayStartOffsetHours(
+                    tzState.homeZone,
+                    nowDate,
+                    viewOffsetHours,
+                    1,
+                  ),
+                )
+              }
             >
               ›
             </S.DayNavButton>
             <S.DayNavButton
               type="button"
-              onClick={() => handleCommitDayOffset(0)}
+              onClick={() => handleCommitViewOffsetHours(0)}
             >
               Today
             </S.DayNavButton>

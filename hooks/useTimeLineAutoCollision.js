@@ -35,12 +35,26 @@ export default function useTimeLineAutoCollision({
     });
 
     const recalcIntervalsXPosFromDayOffset = (timeInterval) => {
-      const xPos1 = timeInterval.xPos1DayOffsetSeconds != null
-        ? calculatePositionFromDayOffset(timeInterval.xPos1DayOffsetSeconds)
-        : timeInterval.xPos1;
-      const xPos2 = timeInterval.xPos2DayOffsetSeconds != null
-        ? calculatePositionFromDayOffset(timeInterval.xPos2DayOffsetSeconds)
-        : timeInterval.xPos2;
+      const xPos1 =
+        timeInterval.xPos1DayOffsetSeconds != null
+          ? calculatePositionFromDayOffset(timeInterval.xPos1DayOffsetSeconds)
+          : timeInterval.xPos1;
+      const xPos2 =
+        timeInterval.xPos2DayOffsetSeconds != null
+          ? calculatePositionFromDayOffset(timeInterval.xPos2DayOffsetSeconds)
+          : timeInterval.xPos2;
+
+      // The endpoint times are the source of truth for duration: on a
+      // scrolled window a seam-straddling interval's pixel span is the
+      // day-complement of the real range.
+      const durationSeconds =
+        timeInterval.xPos1DayOffsetSeconds != null &&
+        timeInterval.xPos2DayOffsetSeconds != null
+          ? Math.abs(
+              timeInterval.xPos2DayOffsetSeconds -
+                timeInterval.xPos1DayOffsetSeconds,
+            )
+          : undefined;
 
       return {
         ...timeInterval,
@@ -51,6 +65,7 @@ export default function useTimeLineAutoCollision({
           xPos2,
           hoursLineWidth: size.hoursLineWidth,
           formatDuration,
+          durationSeconds,
         }),
       };
     };

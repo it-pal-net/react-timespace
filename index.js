@@ -38,9 +38,9 @@ export {
 export {
   formatDurationShort,
   formatDeltaToLocal,
+  formatHourOffsetLabel,
   getTimeZoneOffsetSecondsSafe,
   getStartOfZonedDayUtcMs,
-  getViewDayStartUtcMs,
   SECONDS_IN_DAY,
   MILLISECONDS_IN_DAY,
   MILLISECONDS_IN_HOUR,

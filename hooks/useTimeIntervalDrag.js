@@ -144,17 +144,25 @@ export default function useTimeIntervalDrag({
       xPos2 = actionPoint === "xPos2" ? newXPos : capturedTimeInterval.xPos2;
     }
 
+    const xPos1DayOffsetSeconds = xPos1 === null ? null : toSeconds(xPos1);
+    const xPos2DayOffsetSeconds = xPos2 === null ? null : toSeconds(xPos2);
     const capturedIntervalDispatchData = {
       ...capturedTimeInterval,
       xPos1,
       xPos2,
-      xPos1DayOffsetSeconds: xPos1 === null ? null : toSeconds(xPos1),
-      xPos2DayOffsetSeconds: xPos2 === null ? null : toSeconds(xPos2),
+      xPos1DayOffsetSeconds,
+      xPos2DayOffsetSeconds,
       ...toDurationData({
         xPos1,
         xPos2,
         hoursLineWidth: sizes.hoursLineWidth,
         formatDuration: formatDurationFn,
+        // Endpoint times drive the duration so a hand dragged across the
+        // scrolled window's wrap seam doesn't read as the day-complement.
+        durationSeconds:
+          xPos1DayOffsetSeconds != null && xPos2DayOffsetSeconds != null
+            ? Math.abs(xPos2DayOffsetSeconds - xPos1DayOffsetSeconds)
+            : undefined,
       }),
     };
 
@@ -245,6 +253,9 @@ export default function useTimeIntervalDrag({
           xPos2: updatedInterval.xPos2,
           hoursLineWidth: sizes.hoursLineWidth,
           formatDuration: formatDurationFn,
+          durationSeconds: Math.abs(
+            xPos2DayOffsetSeconds - xPos1DayOffsetSeconds,
+          ),
         }),
       };
     }
