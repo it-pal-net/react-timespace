@@ -22,6 +22,7 @@ export default function useTimeLineMeasurements({
     hoursLineWidth: null,
     topOffset: null,
     topOffsetRelative: null,
+    rowsBottomRelative: null,
     tailOffset: null,
     leftOffset: null,
     leftListOffset: null,
@@ -66,8 +67,7 @@ export default function useTimeLineMeasurements({
     // the "2h" duration label a header height past the visible bottom (and off
     // the panel edge). Cap it at the list height so the lines end at the visible
     // bottom and the label lands in the whitespace just below.
-    const tailBodyHeight =
-      itemsHeight > listHeight ? listHeight : itemsHeight;
+    const tailBodyHeight = itemsHeight > listHeight ? listHeight : itemsHeight;
 
     const headerContentEls = Array.from(
       listElRef.current.querySelectorAll(".time-line-header-content"),
@@ -84,6 +84,14 @@ export default function useTimeLineMeasurements({
     const topOffsetRelative =
       itemsHeight >= listHeight ? 0 : firstTimelineElRect.top - listElRect.top;
 
+    // Bottom edge of the visible row stack, relative to the list top.
+    // itemsHeight overshoots the rows by topTailOffset (marker-tail span), so
+    // subtract it back; an overflowing list is just its own bottom edge.
+    const rowsBottomRelative =
+      itemsHeight >= listHeight
+        ? listHeight
+        : topOffsetRelative + itemsHeight - topTailOffset;
+
     setSize((currentSize) => ({
       ...currentSize,
       listHeight,
@@ -91,6 +99,7 @@ export default function useTimeLineMeasurements({
       hoursLineWidth: firstHoursElRect.width,
       topOffset: itemsHeight > listHeight ? topListOffset : topFirstLineOffset,
       topOffsetRelative,
+      rowsBottomRelative,
       tailOffset: topTailOffset,
       timeLineItemHeaderHeight,
       leftOffset: firstHoursElRect.left - listElRect.left,

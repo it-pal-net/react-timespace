@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The floating day pill moved to the bottom-right corner.** Pinned to the
+  top it covered the first row (and the interval hands' clocks and
+  calendar/delete controls) whenever the rows filled the list. It now hangs
+  just below the row stack, right-aligned — clear of the interval controls
+  above the rows and of the duration label below their center — dropping into
+  the bottom headroom (the band consumers already reserve for the hand tails)
+  when the list overflows.
+
 ## 0.6.0
 
 Free horizontal scrolling — the day snapping from 0.5.0 is gone.

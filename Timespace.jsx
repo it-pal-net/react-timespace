@@ -52,6 +52,7 @@ import {
   zIndexFloors,
   backdropFilter,
   intervalPosKeys,
+  dayNavRowGap,
 } from "./constants";
 import { withThemeDefaults } from "./theme";
 import resolveTheme from "./theming/resolveTheme";
@@ -606,8 +607,22 @@ const Timespace = ({
           </S.TimePoint>
         )}
 
+        {/* Bottom-right corner, just below the row stack: the band above the
+            rows is where interval hands park their clocks and calendar/delete
+            controls, and the bottom-center band is where the duration label
+            hangs — the right corner is the spot that stays clear of both.
+            With an overflowing list (rowsBottomRelative = list height) the
+            pill drops into the headroom below the component — the band
+            consumers already reserve for the hand tails. */}
         {effectiveOffsetHours !== 0 && (
-          <S.DayNav data-timespace-day-nav>
+          <S.DayNav
+            data-timespace-day-nav
+            style={
+              size.rowsBottomRelative != null
+                ? { top: size.rowsBottomRelative + dayNavRowGap }
+                : undefined
+            }
+          >
             <S.DayNavButton
               type="button"
               aria-label="Previous day start"

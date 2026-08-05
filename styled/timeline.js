@@ -229,9 +229,11 @@ export const Hours = styled.div`
 
 export const DayNav = styled.div`
   position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Bottom-right corner, hanging below the row stack via an inline \`top\` set
+     in Timespace.jsx (measurement-driven). This is the pre-measurement
+     fallback: just below the list, in the headroom the hand tails bleed into. */
+  top: calc(100% + 8px);
+  right: 12px;
   display: flex;
   align-items: center;
   gap: 2px;

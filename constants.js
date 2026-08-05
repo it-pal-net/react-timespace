@@ -3,6 +3,9 @@
 export const labelTailHeight = 40;
 export const clockXTransformPercent = 10;
 
+// Gap between the bottom edge of the row stack and the day-nav pill.
+export const dayNavRowGap = 8;
+
 // Width of the invisible grab strip centered on each interval hand.
 export const intervalHitStripWidth = 16;
 
